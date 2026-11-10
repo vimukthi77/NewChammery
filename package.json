@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "seed": "node --loader ts-node/esm scripts/seed.ts"
+    "seed": "node scripts/seed.js"
   },
   "dependencies": {
     "@simplewebauthn/browser": "^9.0.1",
