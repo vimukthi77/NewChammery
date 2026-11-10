@@ -3,16 +3,19 @@ import { verifyAuthenticationResponse } from '@simplewebauthn/server';
 import connectDB from '@/lib/db';
 import User from '@/lib/models/User';
 import BiometricCredential from '@/lib/models/BiometricCredential';
-
-const RP_ID = process.env.RP_ID || 'localhost';
+import { getWebAuthnConfig } from '@/lib/webauthn';
 
 export async function POST(req: Request) {
   try {
-    const { response, challenge } = await req.json();
+    const { response, challenge, clientHostname, clientOrigin } = await req.json();
 
     await connectDB();
 
-    const credentialId = response.id;
+    const credentialId = response?.id;
+    if (!credentialId) {
+      return NextResponse.json({ success: false, error: 'Invalid response from biometric sensor' }, { status: 400 });
+    }
+
     const credential = await BiometricCredential.findOne({ credentialId });
     if (!credential) {
       return NextResponse.json({ success: false, error: 'Credential not recognized. Please login with password.' }, { status: 400 });
@@ -23,13 +26,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'User account not active or found.' }, { status: 403 });
     }
 
-    const origin = req.headers.get('origin') || process.env.ORIGIN || 'http://localhost:3000';
+    const { rpID, origin } = getWebAuthnConfig(req, clientHostname, clientOrigin);
 
     const verification = await verifyAuthenticationResponse({
       response,
       expectedChallenge: challenge,
       expectedOrigin: origin,
-      expectedRPID: RP_ID,
+      expectedRPID: rpID,
       authenticator: {
         credentialID: Buffer.from(credential.credentialId, 'base64url'),
         credentialPublicKey: Buffer.from(credential.publicKey, 'base64'),
@@ -61,4 +64,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
-

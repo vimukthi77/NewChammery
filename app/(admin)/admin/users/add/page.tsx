@@ -14,7 +14,8 @@ import {
   DollarSign,
   CheckCircle2,
   AlertTriangle,
-  Copy
+  Copy,
+  ChefHat
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -23,7 +24,7 @@ export default function AddUserPage() {
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'user' | 'admin'>('user');
+  const [role, setRole] = useState<'user' | 'cook' | 'admin'>('user');
   const [initialPoints, setInitialPoints] = useState('20');
   const [initialAmount, setInitialAmount] = useState('0');
   const [loading, setLoading] = useState(false);
@@ -141,29 +142,41 @@ export default function AddUserPage() {
           <label className="block text-xs font-bold text-[#1A1A2E] uppercase tracking-wider mb-1.5">
             Role
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
               onClick={() => setRole('user')}
-              className={`py-2.5 px-3 rounded-2xl border text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+              className={`py-2.5 px-2 rounded-2xl border text-xs font-bold transition flex items-center justify-center gap-1 ${
                 role === 'user'
                   ? 'bg-[#1A1A2E] text-white border-[#1A1A2E]'
                   : 'bg-white text-gray-700 border-[#F5E6D3]'
               }`}
             >
-              <span>Staff Member</span>
+              <span>Staff</span>
             </button>
             <button
               type="button"
-              onClick={() => setRole('admin')}
-              className={`py-2.5 px-3 rounded-2xl border text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                role === 'admin'
+              onClick={() => setRole('cook')}
+              className={`py-2.5 px-2 rounded-2xl border text-xs font-bold transition flex items-center justify-center gap-1 ${
+                role === 'cook'
                   ? 'bg-[#E67E22] text-white border-[#E67E22]'
                   : 'bg-white text-gray-700 border-[#F5E6D3]'
               }`}
             >
+              <ChefHat size={14} />
+              <span>Cook</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRole('admin')}
+              className={`py-2.5 px-2 rounded-2xl border text-xs font-bold transition flex items-center justify-center gap-1 ${
+                role === 'admin'
+                  ? 'bg-[#8B4513] text-white border-[#8B4513]'
+                  : 'bg-white text-gray-700 border-[#F5E6D3]'
+              }`}
+            >
               <Shield size={14} />
-              <span>Admin Access</span>
+              <span>Admin</span>
             </button>
           </div>
         </div>

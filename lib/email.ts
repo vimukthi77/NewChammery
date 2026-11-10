@@ -3,7 +3,19 @@ import nodemailer from 'nodemailer';
 const EMAIL_USER = process.env.EMAIL_USER || 'newchammery@gmail.com';
 const EMAIL_APP_PASSWORD = process.env.EMAIL_APP_PASSWORD || 'ibvghpwabpsjzgnw';
 const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME || 'Chammery';
-const NEXTAUTH_URL = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+
+const getBaseUrl = () => {
+  if (process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes('localhost')) {
+    return process.env.NEXTAUTH_URL.replace(/\/$/, '');
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`.replace(/\/$/, '');
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://new-chammery.vercel.app';
+  }
+  return (process.env.NEXTAUTH_URL || 'http://localhost:3000').replace(/\/$/, '');
+};
 
 export const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -22,7 +34,7 @@ export async function sendWelcomeEmail({
   name: string;
   password: string;
 }) {
-  const loginUrl = `${NEXTAUTH_URL}/login`;
+  const loginUrl = `${getBaseUrl()}/login`;
 
   const html = `
 <!DOCTYPE html>

@@ -5,7 +5,7 @@ export interface IUser extends Document {
   name: string;
   email: string;
   password?: string;
-  role: 'admin' | 'user';
+  role: 'admin' | 'user' | 'cook';
   isActive: boolean;
   biometricCredentialId?: string;
   biometricPublicKey?: string;
@@ -19,7 +19,7 @@ const UserSchema = new Schema<IUser>(
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true },
-    role: { type: String, enum: ['admin', 'user'], default: 'user' },
+    role: { type: String, enum: ['admin', 'user', 'cook'], default: 'user' },
     isActive: { type: Boolean, default: true },
     biometricCredentialId: { type: String, default: null },
     biometricPublicKey: { type: String, default: null },
@@ -32,4 +32,3 @@ const UserSchema = new Schema<IUser>(
 
 export const User: Model<IUser> = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
 export default User;
-

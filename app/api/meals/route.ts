@@ -23,6 +23,7 @@ export async function GET(req: Request) {
     const targetUserId = searchParams.get('userId');
 
     const isAdmin = (session.user as any).role === 'admin';
+    const isCook = (session.user as any).role === 'cook';
     const effectiveUserId = (isAdmin && targetUserId) ? targetUserId : (session.user as any).id;
 
     await connectDB();
@@ -41,14 +42,46 @@ export async function GET(req: Request) {
     if (dateParam) {
       const queryDate = normalizeDate(new Date(dateParam));
 
-      if (isAdmin && allUsers) {
-        const requests = await MealRequest.find({ date: queryDate })
+      if ((isAdmin || isCook) && (allUsers || isCook)) {
+        const requests = await MealRequest.find({ date: queryDate, status: { $ne: 'cancelled' } })
           .populate('userId', 'name email profileImage')
           .sort({ createdAt: -1 });
+
+        // Calculate lists and counts
+        const breakfastList: any[] = [];
+        const lunchList: any[] = [];
+        const dinnerList: any[] = [];
+
+        requests.forEach((r: any) => {
+          if (!r.userId) return;
+          const userItem = {
+            _id: r.userId._id,
+            name: r.userId.name,
+            email: r.userId.email,
+            profileImage: r.userId.profileImage,
+            status: r.status,
+            requestedAt: r.requestedAt || r.createdAt,
+            totalPoints: r.totalPoints,
+          };
+          if (r.breakfast) breakfastList.push(userItem);
+          if (r.lunch) lunchList.push(userItem);
+          if (r.dinner) dinnerList.push(userItem);
+        });
 
         return NextResponse.json({
           success: true,
           date: dateParam,
+          counts: {
+            breakfast: breakfastList.length,
+            lunch: lunchList.length,
+            dinner: dinnerList.length,
+            totalPoints: requests.reduce((s, r) => s + (r.totalPoints || 0), 0),
+          },
+          lists: {
+            breakfastList,
+            lunchList,
+            dinnerList,
+          },
           requests,
           cutoffs,
         });

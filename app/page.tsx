@@ -18,7 +18,7 @@ export default function WelcomePage() {
     if (seen) {
       if (session) {
         const role = (session.user as any)?.role;
-        router.replace(role === 'admin' ? '/admin/dashboard' : '/dashboard');
+        router.replace(role === 'admin' ? '/admin/dashboard' : (role === 'cook' ? '/cook/dashboard' : '/dashboard'));
       } else {
         router.replace('/login');
       }
@@ -29,7 +29,7 @@ export default function WelcomePage() {
     localStorage.setItem('chammery_welcome_seen', 'true');
     if (session) {
       const role = (session.user as any)?.role;
-      router.push(role === 'admin' ? '/admin/dashboard' : '/dashboard');
+      router.push(role === 'admin' ? '/admin/dashboard' : (role === 'cook' ? '/cook/dashboard' : '/dashboard'));
     } else {
       router.push('/login');
     }

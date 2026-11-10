@@ -23,6 +23,10 @@ export default function BiometricModal({ isOpen, onClose, onSuccess }: Biometric
       const optRes = await fetch('/api/biometric/register-options', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientHostname: typeof window !== 'undefined' ? window.location.hostname : undefined,
+          clientOrigin: typeof window !== 'undefined' ? window.location.origin : undefined,
+        }),
       });
       const optData = await optRes.json();
 
@@ -41,6 +45,8 @@ export default function BiometricModal({ isOpen, onClose, onSuccess }: Biometric
           response: regResponse,
           challenge: optData.options.challenge,
           deviceName: navigator.userAgent.includes('Mobile') ? 'Mobile Device' : 'Desktop Browser',
+          clientHostname: typeof window !== 'undefined' ? window.location.hostname : undefined,
+          clientOrigin: typeof window !== 'undefined' ? window.location.origin : undefined,
         }),
       });
 

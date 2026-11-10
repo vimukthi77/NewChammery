@@ -11,12 +11,25 @@ import { normalizeDate } from '@/lib/utils';
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || (session.user as any)?.role !== 'admin') {
-      return NextResponse.json({ success: false, error: 'Unauthorized. Admin access required.' }, { status: 403 });
+    if (!session) {
+      return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
+    }
+
+    const userRole = (session.user as any)?.role;
+    const isAdmin = userRole === 'admin';
+    const isCook = userRole === 'cook';
+
+    if (!isAdmin && !isCook) {
+      return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
     const type = searchParams.get('type') || 'summary'; // 'individual' | 'summary' | 'daily'
+
+    // Cook role is restricted to daily reports only
+    if (isCook && type !== 'daily') {
+      return NextResponse.json({ success: false, error: 'Kitchen Cook can only access daily reports.' }, { status: 403 });
+    }
     const date = searchParams.get('date');
     const dateFrom = searchParams.get('dateFrom');
     const dateTo = searchParams.get('dateTo');

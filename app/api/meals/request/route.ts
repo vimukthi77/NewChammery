@@ -23,6 +23,15 @@ export async function POST(req: Request) {
     }
 
     const isAdmin = (session.user as any).role === 'admin';
+    const isCook = (session.user as any).role === 'cook';
+
+    // Kitchen cook cannot request personal meals
+    if (isCook) {
+      return NextResponse.json({
+        success: false,
+        error: 'Kitchen Cook accounts cannot place personal meal requests.',
+      }, { status: 403 });
+    }
 
     // Admin cannot request meals for their own admin account
     if (isAdmin && !targetUserId) {

@@ -182,6 +182,11 @@ export default function AdminUsersPage() {
                         Admin
                       </span>
                     )}
+                    {user.role === 'cook' && (
+                      <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase bg-[#E67E22]/15 text-[#E67E22]">
+                        Cook 🍳
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
                     <Mail size={12} /> {user.email}

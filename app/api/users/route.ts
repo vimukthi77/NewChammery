@@ -94,11 +94,15 @@ export async function POST(req: Request) {
     const autoPassword = generateSecurePassword(8);
     const hashedPassword = await bcrypt.hash(autoPassword, 12);
 
+    let assignedRole = 'user';
+    if (role === 'admin') assignedRole = 'admin';
+    else if (role === 'cook') assignedRole = 'cook';
+
     const newUser = await User.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password: hashedPassword,
-      role: role === 'admin' ? 'admin' : 'user',
+      role: assignedRole,
       isActive: true,
     });
 

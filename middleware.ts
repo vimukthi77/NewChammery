@@ -5,10 +5,28 @@ export default withAuth(
   function middleware(req) {
     const token = req.nextauth.token;
     const path = req.nextUrl.pathname;
+    const role = token?.role;
 
-    // Admin access vs User access separation
-    if (token?.role === 'admin') {
-      // Admin should only access admin portal & profile, never meal requesting
+    // 1. Cook access separation
+    if (role === 'cook') {
+      // Cook can only access /cook/* and /profile/*
+      if (
+        path === '/dashboard' ||
+        path.startsWith('/dashboard') ||
+        path === '/meals' ||
+        path.startsWith('/meals') ||
+        path === '/history' ||
+        path.startsWith('/history') ||
+        path === '/balance' ||
+        path.startsWith('/balance') ||
+        path.startsWith('/admin')
+      ) {
+        return NextResponse.redirect(new URL('/cook/dashboard', req.url));
+      }
+    }
+    // 2. Admin access separation
+    else if (role === 'admin') {
+      // Admin should access admin portal, cook portal, and profile, never meal requesting
       if (
         path === '/dashboard' ||
         path.startsWith('/dashboard') ||
@@ -21,9 +39,11 @@ export default withAuth(
       ) {
         return NextResponse.redirect(new URL('/admin/dashboard', req.url));
       }
-    } else {
-      // Regular user cannot access admin routes
-      if (path.startsWith('/admin')) {
+    }
+    // 3. Regular user access separation
+    else {
+      // Regular user cannot access admin or cook routes
+      if (path.startsWith('/admin') || path.startsWith('/cook')) {
         return NextResponse.redirect(new URL('/dashboard', req.url));
       }
     }
@@ -50,7 +70,7 @@ export default withAuth(
           return true;
         }
 
-        // Require token for user and admin routes
+        // Require token for protected routes
         return !!token;
       },
     },
@@ -65,6 +85,6 @@ export const config = {
     '/balance/:path*',
     '/profile/:path*',
     '/admin/:path*',
+    '/cook/:path*',
   ],
 };
-

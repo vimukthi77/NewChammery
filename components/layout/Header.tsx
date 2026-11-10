@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
-import { Bell, ShieldCheck, User as UserIcon, Utensils } from 'lucide-react';
+import { Bell, ShieldCheck, User as UserIcon, Utensils, ChefHat } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Header() {
@@ -35,7 +35,10 @@ export default function Header() {
     <header className="sticky top-0 z-40 bg-[#FFF8F0]/90 backdrop-blur-md border-b border-[#F5E6D3]/60 px-4 py-3">
       <div className="max-w-4xl mx-auto flex items-center justify-between">
         {/* Left: Brand / Logo */}
-        <Link href={role === 'admin' ? '/admin/dashboard' : '/dashboard'} className="flex items-center gap-2.5">
+        <Link
+          href={role === 'admin' ? '/admin/dashboard' : (role === 'cook' ? '/cook/dashboard' : '/dashboard')}
+          className="flex items-center gap-2.5"
+        >
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#E67E22] to-[#8B4513] flex items-center justify-center text-white shadow-md shadow-[#E67E22]/20">
             <Utensils size={20} className="stroke-[2.5]" />
           </div>
@@ -44,18 +47,24 @@ export default function Header() {
               Chammery
             </span>
             <span className="text-[10px] font-semibold text-[#8B4513] tracking-wider uppercase block mt-0.5">
-              {role === 'admin' ? 'Admin Portal' : 'Meal Portal'}
+              {role === 'admin' ? 'Admin Portal' : (role === 'cook' ? 'Kitchen Portal' : 'Meal Portal')}
             </span>
           </div>
         </Link>
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2.5">
-          {/* Admin Role Badge */}
+          {/* Role Badges */}
           {role === 'admin' && (
             <div className="text-xs px-3 py-1.5 rounded-full font-bold bg-[#1A1A2E] text-white flex items-center gap-1.5 shadow-sm">
               <ShieldCheck size={14} className="text-[#E67E22]" />
               <span>Admin Access</span>
+            </div>
+          )}
+          {role === 'cook' && (
+            <div className="text-xs px-3 py-1.5 rounded-full font-bold bg-[#E67E22] text-white flex items-center gap-1.5 shadow-sm">
+              <ChefHat size={14} />
+              <span>Kitchen Staff</span>
             </div>
           )}
 

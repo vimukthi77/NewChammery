@@ -14,7 +14,8 @@ import {
   BarChart3,
   Sliders,
   DollarSign,
-  ClipboardList
+  ClipboardList,
+  ChefHat
 } from 'lucide-react';
 
 export default function BottomNav() {
@@ -46,7 +47,13 @@ export default function BottomNav() {
     { label: 'Cutoffs', href: '/admin/cutoff-settings', icon: Sliders },
   ];
 
-  const navItems = role === 'admin' ? adminNavItems : userNavItems;
+  // Cook navigation
+  const cookNavItems = [
+    { label: 'Kitchen Roster', href: '/cook/dashboard', icon: ChefHat },
+    { label: 'Profile', href: '/profile', icon: User },
+  ];
+
+  const navItems = role === 'admin' ? adminNavItems : (role === 'cook' ? cookNavItems : userNavItems);
 
   return (
     <div className="fixed bottom-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">

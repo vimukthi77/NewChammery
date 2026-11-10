@@ -62,6 +62,11 @@ export default function LoginPage() {
         return;
       }
 
+      if (userRole === 'cook') {
+        router.push('/cook/dashboard');
+        return;
+      }
+
       // If regular user and biometric not yet enrolled, prompt user to enable it
       const enrolled = localStorage.getItem('chammery_biometric_enabled');
       if (!enrolled) {
@@ -84,7 +89,11 @@ export default function LoginPage() {
       const optRes = await fetch('/api/biometric/login-options', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email || null }),
+        body: JSON.stringify({
+          email: email || null,
+          clientHostname: typeof window !== 'undefined' ? window.location.hostname : undefined,
+          clientOrigin: typeof window !== 'undefined' ? window.location.origin : undefined,
+        }),
       });
       const optData = await optRes.json();
 
@@ -102,6 +111,8 @@ export default function LoginPage() {
         body: JSON.stringify({
           response: authResponse,
           challenge: optData.options.challenge,
+          clientHostname: typeof window !== 'undefined' ? window.location.hostname : undefined,
+          clientOrigin: typeof window !== 'undefined' ? window.location.origin : undefined,
         }),
       });
 
@@ -125,6 +136,8 @@ export default function LoginPage() {
       toast.success('Biometric login successful!');
       if (verifyData.user?.role === 'admin') {
         router.push('/admin/dashboard');
+      } else if (verifyData.user?.role === 'cook') {
+        router.push('/cook/dashboard');
       } else {
         router.push('/dashboard');
       }

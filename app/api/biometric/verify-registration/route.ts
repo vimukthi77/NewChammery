@@ -5,8 +5,7 @@ import { authOptions } from '@/lib/auth';
 import connectDB from '@/lib/db';
 import User from '@/lib/models/User';
 import BiometricCredential from '@/lib/models/BiometricCredential';
-
-const RP_ID = process.env.RP_ID || 'localhost';
+import { getWebAuthnConfig } from '@/lib/webauthn';
 
 export async function POST(req: Request) {
   try {
@@ -15,15 +14,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { response, challenge, deviceName } = await req.json();
+    const { response, challenge, deviceName, clientHostname, clientOrigin } = await req.json();
 
-    const origin = req.headers.get('origin') || process.env.ORIGIN || 'http://localhost:3000';
+    const { rpID, origin } = getWebAuthnConfig(req, clientHostname, clientOrigin);
 
     const verification = await verifyRegistrationResponse({
       response,
       expectedChallenge: challenge,
       expectedOrigin: origin,
-      expectedRPID: RP_ID,
+      expectedRPID: rpID,
     });
 
     if (verification.verified && verification.registrationInfo) {
@@ -68,4 +67,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
-

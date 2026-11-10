@@ -5,9 +5,9 @@ import { authOptions } from '@/lib/auth';
 import connectDB from '@/lib/db';
 import User from '@/lib/models/User';
 import BiometricCredential from '@/lib/models/BiometricCredential';
+import { getWebAuthnConfig } from '@/lib/webauthn';
 
 const RP_NAME = process.env.RP_NAME || 'Chammery Meal Management';
-const RP_ID = process.env.RP_ID || 'localhost';
 
 export async function POST(req: Request) {
   try {
@@ -15,6 +15,11 @@ export async function POST(req: Request) {
     if (!session || !(session.user as any)?.id) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
+
+    const body = await req.json().catch(() => ({}));
+    const { clientHostname, clientOrigin } = body;
+
+    const { rpID } = getWebAuthnConfig(req, clientHostname, clientOrigin);
 
     await connectDB();
     const userId = (session.user as any).id;
@@ -33,7 +38,7 @@ export async function POST(req: Request) {
 
     const options = await generateRegistrationOptions({
       rpName: RP_NAME,
-      rpID: RP_ID,
+      rpID,
       userID: user._id.toString(),
       userName: user.email,
       userDisplayName: user.name,

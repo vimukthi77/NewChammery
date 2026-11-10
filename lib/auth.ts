@@ -85,6 +85,30 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
+    async redirect({ url, baseUrl }) {
+      // If baseUrl is pointing to localhost but running in production / Vercel
+      let effectiveBase = baseUrl;
+      if (effectiveBase.includes('localhost') && process.env.VERCEL_URL) {
+        effectiveBase = `https://${process.env.VERCEL_URL}`;
+      } else if (effectiveBase.includes('localhost') && process.env.NODE_ENV === 'production') {
+        effectiveBase = 'https://new-chammery.vercel.app';
+      }
+
+      // Allows relative URLs
+      if (url.startsWith('/')) {
+        return `${effectiveBase.replace(/\/$/, '')}${url}`;
+      }
+
+      // Allows URLs on the same deployment or origin
+      try {
+        const targetUrl = new URL(url);
+        if (targetUrl.hostname.includes('vercel.app') || targetUrl.hostname === 'localhost') {
+          return url;
+        }
+      } catch {}
+
+      return effectiveBase;
+    },
   },
   session: {
     strategy: 'jwt',

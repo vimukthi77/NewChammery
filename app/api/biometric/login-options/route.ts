@@ -3,12 +3,14 @@ import { generateAuthenticationOptions } from '@simplewebauthn/server';
 import connectDB from '@/lib/db';
 import User from '@/lib/models/User';
 import BiometricCredential from '@/lib/models/BiometricCredential';
-
-const RP_ID = process.env.RP_ID || 'localhost';
+import { getWebAuthnConfig } from '@/lib/webauthn';
 
 export async function POST(req: Request) {
   try {
-    const { email } = await req.json().catch(() => ({ email: null }));
+    const body = await req.json().catch(() => ({}));
+    const { email, clientHostname, clientOrigin } = body;
+
+    const { rpID } = getWebAuthnConfig(req, clientHostname, clientOrigin);
 
     await connectDB();
 
@@ -29,7 +31,7 @@ export async function POST(req: Request) {
     }
 
     const options = await generateAuthenticationOptions({
-      rpID: RP_ID,
+      rpID,
       allowCredentials,
       userVerification: 'preferred',
     });

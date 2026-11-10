@@ -73,7 +73,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
     if (name) user.name = name.trim();
     if (email) user.email = email.toLowerCase().trim();
-    if (role && ['admin', 'user'].includes(role)) user.role = role;
+    if (role && ['admin', 'user', 'cook'].includes(role)) user.role = role;
     if (typeof isActive === 'boolean') user.isActive = isActive;
 
     let newPassword = null;
