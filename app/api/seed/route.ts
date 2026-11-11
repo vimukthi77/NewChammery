@@ -21,6 +21,19 @@ export async function GET() {
       });
     }
 
+    // Check or create Cook
+    let cook = await User.findOne({ email: 'cook@chammery.com' });
+    if (!cook) {
+      const hashedPassword = await bcrypt.hash('Cook@123', 12);
+      cook = await User.create({
+        name: 'Kitchen Chef',
+        email: 'cook@chammery.com',
+        password: hashedPassword,
+        role: 'cook',
+        isActive: true,
+      });
+    }
+
     // Check or create default cutoffs
     let cutoffs = await CutoffSettings.findOne();
     if (!cutoffs) {
@@ -38,6 +51,10 @@ export async function GET() {
       admin: {
         email: admin.email,
         role: admin.role,
+      },
+      cook: {
+        email: cook.email,
+        role: cook.role,
       },
       cutoffs,
     });

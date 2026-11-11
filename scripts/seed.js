@@ -45,6 +45,21 @@ async function seed() {
       console.log('Default admin already exists: admin@chammery.com');
     }
 
+    let cook = await User.findOne({ email: 'cook@chammery.com' });
+    if (!cook) {
+      const hashedPassword = await bcrypt.hash('Cook@123', 12);
+      cook = await User.create({
+        name: 'Kitchen Chef',
+        email: 'cook@chammery.com',
+        password: hashedPassword,
+        role: 'cook',
+        isActive: true,
+      });
+      console.log('Default cook created: cook@chammery.com / Cook@123');
+    } else {
+      console.log('Default cook already exists: cook@chammery.com');
+    }
+
     let cutoffs = await CutoffSettings.findOne();
     if (!cutoffs) {
       cutoffs = await CutoffSettings.create({
