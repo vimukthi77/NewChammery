@@ -38,7 +38,7 @@ export async function GET(req: Request) {
     // Aggregate points for each user
     const usersWithStats = await Promise.all(
       users.map(async (u) => {
-        // Topups points
+        // Topups points and amounts
         const topups = await Topup.aggregate([
           { $match: { userId: u._id } },
           { $group: { _id: null, totalPoints: { $sum: '$points' }, totalAmount: { $sum: '$amount' } } },
@@ -46,9 +46,14 @@ export async function GET(req: Request) {
         const allocatedPoints = topups[0]?.totalPoints || 0;
         const totalTopupAmount = topups[0]?.totalAmount || 0;
 
-        // Meal requests points
+        // Meal requests points from user's startDate or all active
+        const mealQuery: any = { userId: u._id, status: { $ne: 'cancelled' } };
+        if (u.startDate) {
+          mealQuery.date = { $gte: u.startDate };
+        }
+
         const meals = await MealRequest.aggregate([
-          { $match: { userId: u._id, status: { $ne: 'cancelled' } } },
+          { $match: mealQuery },
           { $group: { _id: null, totalPoints: { $sum: '$totalPoints' } } },
         ]);
         const usedPoints = meals[0]?.totalPoints || 0;
@@ -56,6 +61,7 @@ export async function GET(req: Request) {
 
         return {
           ...u.toObject(),
+          balance: typeof u.balance === 'number' ? u.balance : totalTopupAmount,
           allocatedPoints,
           usedPoints,
           remainingPoints,
@@ -78,7 +84,14 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { name, email, role = 'user', initialPoints = 0, initialAmount = 0 } = body;
+    const {
+      name,
+      email,
+      role = 'user',
+      initialPoints = 0,
+      initialAmount = 15000,
+      startDate,
+    } = body;
 
     if (!name || !email) {
       return NextResponse.json({ success: false, error: 'Name and email are required.' }, { status: 400 });
@@ -98,23 +111,29 @@ export async function POST(req: Request) {
     if (role === 'admin') assignedRole = 'admin';
     else if (role === 'cook') assignedRole = 'cook';
 
+    const startingBalance = assignedRole === 'user' ? Number(initialAmount ?? 15000) : 0;
+    const parsedStartDate = startDate ? new Date(startDate) : new Date();
+
     const newUser = await User.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password: hashedPassword,
       role: assignedRole,
       isActive: true,
+      balance: startingBalance,
+      startDate: parsedStartDate,
     });
 
-    // If initial points provided, create initial topup
-    if (Number(initialPoints) > 0 || Number(initialAmount) > 0) {
+    // Create initial balance topup record if user role
+    if (assignedRole === 'user' && (startingBalance > 0 || Number(initialPoints) > 0)) {
       const currentMonth = new Date().toISOString().slice(0, 7);
       await Topup.create({
         userId: newUser._id,
-        amount: Number(initialAmount) || 0,
+        amount: startingBalance,
         points: Number(initialPoints) || 0,
+        type: 'initial_balance',
         month: currentMonth,
-        description: 'Initial allocation on account creation',
+        description: 'Initial balance allocation on account creation',
         addedBy: (session.user as any).id,
       });
     }

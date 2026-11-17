@@ -58,16 +58,26 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { userId, points, amount = 0, month, description = 'Monthly allocation' } = body;
+    const {
+      userId,
+      points = 0,
+      amount = 0,
+      month,
+      type,
+      description = 'Monthly balance top-up',
+      date,
+    } = body;
 
-    if (!userId || points === undefined || points === null) {
-      return NextResponse.json({ success: false, error: 'User ID and Points are required.' }, { status: 400 });
+    if (!userId) {
+      return NextResponse.json({ success: false, error: 'User ID is required.' }, { status: 400 });
     }
 
     const currentMonth = month || new Date().toISOString().slice(0, 7);
-    const parsedPoints = Number(points);
+    const parsedPoints = Number(points) || 0;
     const parsedAmount = Number(amount) || 0;
     const adminId = (session.user as any).id;
+    const determinedType = type || (parsedAmount > 0 ? 'topup' : 'points_adjustment');
+    const recordDate = date ? new Date(date) : new Date();
 
     await connectDB();
 
@@ -78,12 +88,22 @@ export async function POST(req: Request) {
         userId: u._id,
         amount: parsedAmount,
         points: parsedPoints,
+        type: determinedType,
         month: currentMonth,
         description: description || `Bulk allocation - ${currentMonth}`,
         addedBy: adminId,
+        createdAt: recordDate,
       }));
 
       const created = await Topup.insertMany(topupDocs);
+
+      // Increment monetary balance for all users if amount > 0
+      if (parsedAmount !== 0) {
+        await User.updateMany(
+          { isActive: true, role: 'user' },
+          { $inc: { balance: parsedAmount } }
+        );
+      }
 
       await AuditLog.create({
         userId: adminId,
@@ -94,7 +114,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         success: true,
-        message: `Successfully allocated points to ${activeUsers.length} users.`,
+        message: `Successfully processed topup/points for ${activeUsers.length} users.`,
         count: created.length,
       });
     }
@@ -109,22 +129,31 @@ export async function POST(req: Request) {
       userId: targetUser._id,
       amount: parsedAmount,
       points: parsedPoints,
+      type: determinedType,
       month: currentMonth,
-      description: description || `Allocation - ${currentMonth}`,
+      description: description || `Topup / Points Adjustment - ${currentMonth}`,
       addedBy: adminId,
+      createdAt: recordDate,
     });
+
+    // Update target user's monetary balance if amount specified
+    if (parsedAmount !== 0) {
+      targetUser.balance = (targetUser.balance ?? 0) + parsedAmount;
+      await targetUser.save();
+    }
 
     await AuditLog.create({
       userId: adminId,
       userName: session.user?.name || 'Admin',
-      action: parsedPoints < 0 ? 'DEDUCT_POINTS' : 'ADD_TOPUP',
-      details: `${parsedPoints < 0 ? 'Deducted' : 'Added'} ${Math.abs(parsedPoints)} points (${parsedAmount} LKR) for ${targetUser.name} (${targetUser.email}). Reason: ${description}`,
+      action: determinedType === 'points_adjustment' ? 'ADD_POINTS_ADJUSTMENT' : 'ADD_TOPUP',
+      details: `${parsedAmount > 0 ? `Added LKR ${parsedAmount}` : ''} ${parsedPoints !== 0 ? `${parsedPoints} points` : ''} for ${targetUser.name} (${targetUser.email}). Reason: ${description}`,
     });
 
     return NextResponse.json({
       success: true,
-      message: 'Topup added successfully.',
+      message: 'Transaction saved successfully.',
       topup: newTopup,
+      newBalance: targetUser.balance,
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

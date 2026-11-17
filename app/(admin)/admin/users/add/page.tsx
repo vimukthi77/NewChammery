@@ -25,8 +25,8 @@ export default function AddUserPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'user' | 'cook' | 'admin'>('user');
-  const [initialPoints, setInitialPoints] = useState('20');
-  const [initialAmount, setInitialAmount] = useState('0');
+  const [initialAmount, setInitialAmount] = useState('15000');
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
   const [createdUserModal, setCreatedUserModal] = useState<any>(null);
 
@@ -46,8 +46,8 @@ export default function AddUserPage() {
           name,
           email,
           role,
-          initialPoints: Number(initialPoints) || 0,
-          initialAmount: Number(initialAmount) || 0,
+          initialAmount: role === 'user' ? (Number(initialAmount) || 15000) : 0,
+          startDate,
         }),
       });
 
@@ -181,42 +181,43 @@ export default function AddUserPage() {
           </div>
         </div>
 
-        {/* Initial Allocation */}
-        <div className="grid grid-cols-2 gap-3 pt-2">
-          <div>
-            <label className="block text-xs font-bold text-[#1A1A2E] uppercase tracking-wider mb-1.5">
-              Initial Points
-            </label>
-            <div className="relative flex items-center">
-              <Coins size={16} className="absolute left-3 text-gray-400" />
-              <input
-                type="number"
-                min="0"
-                value={initialPoints}
-                onChange={(e) => setInitialPoints(e.target.value)}
-                placeholder="20"
-                className="w-full pl-9 pr-3 py-2.5 bg-[#FFF8F0]/60 border border-[#F5E6D3] rounded-2xl text-xs sm:text-sm text-[#1A1A2E] focus:ring-2 focus:ring-[#E67E22] focus:outline-none"
-              />
+        {/* Initial Balance & Start Date */}
+        {role === 'user' && (
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <div>
+              <label className="block text-xs font-bold text-[#1A1A2E] uppercase tracking-wider mb-1.5">
+                Starting Balance (LKR) *
+              </label>
+              <div className="relative flex items-center">
+                <DollarSign size={16} className="absolute left-3 text-[#27AE60]" />
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={initialAmount}
+                  onChange={(e) => setInitialAmount(e.target.value)}
+                  placeholder="15000"
+                  className="w-full pl-9 pr-3 py-2.5 bg-[#FFF8F0]/60 border border-[#F5E6D3] rounded-2xl text-xs sm:text-sm font-bold text-[#1A1A2E] focus:ring-2 focus:ring-[#E67E22] focus:outline-none"
+                />
+              </div>
+              <span className="text-[10px] text-gray-500 mt-1 block">Default: 15,000 LKR</span>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-xs font-bold text-[#1A1A2E] uppercase tracking-wider mb-1.5">
-              Amount (LKR)
-            </label>
-            <div className="relative flex items-center">
-              <DollarSign size={16} className="absolute left-3 text-gray-400" />
+            <div>
+              <label className="block text-xs font-bold text-[#1A1A2E] uppercase tracking-wider mb-1.5">
+                Meal Tracking Start Date *
+              </label>
               <input
-                type="number"
-                min="0"
-                value={initialAmount}
-                onChange={(e) => setInitialAmount(e.target.value)}
-                placeholder="0"
-                className="w-full pl-9 pr-3 py-2.5 bg-[#FFF8F0]/60 border border-[#F5E6D3] rounded-2xl text-xs sm:text-sm text-[#1A1A2E] focus:ring-2 focus:ring-[#E67E22] focus:outline-none"
+                type="date"
+                required
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full px-3 py-2.5 bg-[#FFF8F0]/60 border border-[#F5E6D3] rounded-2xl text-xs sm:text-sm font-bold text-[#1A1A2E] focus:ring-2 focus:ring-[#E67E22] focus:outline-none cursor-pointer"
               />
+              <span className="text-[10px] text-gray-500 mt-1 block">Points counted from this date</span>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Submit */}
         <div className="pt-4">

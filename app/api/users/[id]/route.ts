@@ -36,7 +36,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     const totalUsed = meals
       .filter((m) => m.status !== 'cancelled')
       .reduce((acc, curr) => acc + (curr.totalPoints || 0), 0);
-    const balance = totalAllocated - totalUsed;
+    const pointBalance = totalAllocated - totalUsed;
+    const monetaryBalance = typeof user.balance === 'number' ? user.balance : 0;
 
     return NextResponse.json({
       success: true,
@@ -44,7 +45,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
       stats: {
         totalAllocated,
         totalUsed,
-        balance,
+        balance: pointBalance,
+        pointBalance,
+        monetaryBalance,
       },
       meals,
       topups,
@@ -63,7 +66,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
     const { id } = params;
     const body = await req.json();
-    const { name, email, role, isActive, resetPassword } = body;
+    const { name, email, role, isActive, balance, resetPassword } = body;
 
     await connectDB();
     const user = await User.findById(id);
@@ -75,6 +78,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     if (email) user.email = email.toLowerCase().trim();
     if (role && ['admin', 'user', 'cook'].includes(role)) user.role = role;
     if (typeof isActive === 'boolean') user.isActive = isActive;
+    if (typeof balance === 'number') user.balance = balance;
 
     let newPassword = null;
     let emailSent = false;

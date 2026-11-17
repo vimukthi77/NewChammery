@@ -12,7 +12,8 @@ import {
   Zap,
   ArrowRight,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Lock
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import MealCard from '@/components/meals/MealCard';
@@ -40,6 +41,7 @@ export default function UserDashboard() {
     allocated: 0,
     used: 0,
     balance: 0,
+    monetaryBalance: 15000,
   });
 
   // Selected meal state
@@ -174,7 +176,7 @@ export default function UserDashboard() {
         </h1>
       </div>
 
-      {/* 2. Point Balance Card */}
+      {/* 2. Monetary & Points Balance Card */}
       <motion.div
         initial={{ y: 15, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -184,34 +186,60 @@ export default function UserDashboard() {
 
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-bold tracking-wider text-[#FFDAB9] uppercase flex items-center gap-1.5">
-            <Sparkles size={14} className="text-[#E67E22]" /> Monthly Balance
+            <Sparkles size={14} className="text-[#E67E22]" /> Account Balance
           </span>
-          <span className="text-[11px] bg-white/10 px-2.5 py-0.5 rounded-full font-medium text-gray-300">
-            {activeDateStr.slice(0, 7)}
+          <span
+            className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold ${
+              userStats.monetaryBalance <= 0
+                ? 'bg-red-500/20 text-red-300 border border-red-500/30'
+                : 'bg-[#27AE60]/20 text-[#2ECC71] border border-[#27AE60]/30'
+            }`}
+          >
+            {userStats.monetaryBalance <= 0 ? 'Deficit / Suspended' : 'Active Account'}
           </span>
         </div>
 
-        <div className="flex items-baseline justify-between">
+        <div className="flex items-baseline justify-between flex-wrap gap-2">
           <div>
-            <div className="text-3xl font-extrabold tracking-tight text-white flex items-center gap-1.5">
-              <span>{userStats.balance}</span>
-              <span className="text-sm font-semibold text-[#FFDAB9]">Points</span>
+            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white flex items-center gap-1.5">
+              <span className={userStats.monetaryBalance <= 0 ? 'text-red-400' : 'text-white'}>
+                LKR {userStats.monetaryBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
             </div>
             <p className="text-xs text-gray-400 mt-0.5">
-              Available points for your meal requests
+              {userStats.monetaryBalance <= 0
+                ? 'Meal ordering blocked due to negative balance'
+                : 'Available balance for meal points settlement'}
             </p>
           </div>
 
           <div className="text-right">
             <div className="text-xs text-gray-300">
-              Allocated: <strong className="text-white">{userStats.allocated}</strong>
+              Period Used: <strong className="text-[#FFDAB9] font-bold">{userStats.used} pts</strong>
             </div>
-            <div className="text-xs text-gray-300 mt-0.5">
-              Used: <strong className="text-[#FFDAB9]">{userStats.used}</strong>
+            <div className="text-[11px] text-gray-400 mt-0.5">
+              1 Pt = Est. at month-end
             </div>
           </div>
         </div>
       </motion.div>
+
+      {/* Negative Balance Alert */}
+      {userStats.monetaryBalance <= 0 && (
+        <div className="p-4 rounded-3xl bg-red-50 border border-red-200 shadow-sm mb-5 flex items-start gap-3">
+          <div className="w-8 h-8 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0 mt-0.5">
+            <Lock size={16} />
+          </div>
+          <div>
+            <h3 className="text-xs font-bold text-red-800">
+              Meal Ordering Suspended (Negative Balance)
+            </h3>
+            <p className="text-[11px] text-red-600 mt-0.5 leading-relaxed">
+              Your account balance is currently in deficit (LKR {userStats.monetaryBalance.toFixed(2)}). You cannot request meals until an Admin tops up your balance.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* 3. Automatic Ordering Banner: Today's Meals OR Tomorrow's Meals */}
       <div className="mb-4">
@@ -306,11 +334,17 @@ export default function UserDashboard() {
 
         <button
           onClick={handleConfirmRequest}
-          disabled={saving}
-          className="py-3 px-6 rounded-2xl bg-[#1A1A2E] hover:bg-black text-white text-xs font-bold shadow-md transition flex items-center gap-2 active:scale-95 disabled:opacity-50"
+          disabled={saving || userStats.monetaryBalance <= 0}
+          className={`py-3 px-6 rounded-2xl text-white text-xs font-bold shadow-md transition flex items-center gap-2 active:scale-95 disabled:opacity-50 ${
+            userStats.monetaryBalance <= 0
+              ? 'bg-red-700 cursor-not-allowed'
+              : 'bg-[#1A1A2E] hover:bg-black'
+          }`}
         >
           {saving ? (
             <span>Saving...</span>
+          ) : userStats.monetaryBalance <= 0 ? (
+            <span>Balance Deficit</span>
           ) : (
             <>
               <span>Confirm Request</span>

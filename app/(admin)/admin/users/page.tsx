@@ -192,20 +192,35 @@ export default function AdminUsersPage() {
                     <Mail size={12} /> {user.email}
                   </p>
 
-                  {/* Points breakdown pill */}
-                  <div className="flex items-center gap-2 mt-2 text-[11px]">
-                    <span className="font-semibold text-gray-500">
-                      Allocated: <strong className="text-[#1A1A2E]">{user.allocatedPoints || 0}</strong>
-                    </span>
-                    <span>•</span>
-                    <span className="font-semibold text-gray-500">
-                      Used: <strong className="text-[#E67E22]">{user.usedPoints || 0}</strong>
-                    </span>
-                    <span>•</span>
-                    <span className="font-semibold text-gray-500">
-                      Balance: <strong className="text-[#27AE60]">{user.remainingPoints || 0} pts</strong>
-                    </span>
-                  </div>
+                  {/* Balance & Points Breakdown */}
+                  {user.role === 'user' && (
+                    <div className="flex items-center gap-2 mt-2 text-[11px] flex-wrap">
+                      <span className="font-semibold text-gray-500">
+                        Balance:{' '}
+                        <strong
+                          className={
+                            (user.balance ?? 0) <= 0
+                              ? 'text-red-600 font-extrabold bg-red-50 px-1.5 py-0.5 rounded border border-red-200'
+                              : 'text-[#27AE60] font-extrabold'
+                          }
+                        >
+                          LKR {(user.balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </strong>
+                      </span>
+                      <span>•</span>
+                      <span className="font-semibold text-gray-500">
+                        Points Used: <strong className="text-[#E67E22]">{user.usedPoints || 0} pts</strong>
+                      </span>
+                      {user.startDate && (
+                        <>
+                          <span>•</span>
+                          <span className="text-gray-400">
+                            Since: {new Date(user.startDate).toLocaleDateString()}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 

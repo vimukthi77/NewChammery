@@ -5,6 +5,7 @@ export interface ITopup extends Document {
   userId: mongoose.Types.ObjectId;
   amount: number;
   points: number;
+  type: 'topup' | 'settlement_deduction' | 'points_adjustment' | 'initial_balance';
   month: string; // "YYYY-MM"
   description: string;
   addedBy: mongoose.Types.ObjectId;
@@ -16,7 +17,12 @@ const TopupSchema = new Schema<ITopup>(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     amount: { type: Number, default: 0 },
-    points: { type: Number, required: true },
+    points: { type: Number, default: 0 },
+    type: {
+      type: String,
+      enum: ['topup', 'settlement_deduction', 'points_adjustment', 'initial_balance'],
+      default: 'topup',
+    },
     month: { type: String, required: true, index: true },
     description: { type: String, default: '' },
     addedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import connectDB from '@/lib/db';
 import MealRequest from '@/lib/models/MealRequest';
+import User from '@/lib/models/User';
 import CutoffSettings from '@/lib/models/CutoffSettings';
 import Topup from '@/lib/models/Topup';
 import { normalizeDate } from '@/lib/utils';
@@ -129,6 +130,7 @@ export async function GET(req: Request) {
     // Calculate user balance if specific user
     let userStats = null;
     if (!allUsers || !isAdmin) {
+      const userDoc = await User.findById(effectiveUserId);
       const topups = await Topup.aggregate([
         { $match: { userId: effectiveUserId } },
         { $group: { _id: null, totalPoints: { $sum: '$points' } } },
@@ -141,6 +143,8 @@ export async function GET(req: Request) {
         allocated,
         used: totalUsed,
         balance: allocated - totalUsed,
+        monetaryBalance: typeof userDoc?.balance === 'number' ? userDoc.balance : 15000,
+        startDate: userDoc?.startDate,
       };
     }
 

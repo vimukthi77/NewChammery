@@ -13,7 +13,10 @@ import {
   History,
   TrendingDown,
   TrendingUp,
-  FileText
+  FileText,
+  AlertTriangle,
+  Calendar,
+  Sparkles
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatCurrency } from '@/lib/utils';
@@ -24,13 +27,14 @@ export default function AdminTopupPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Form states
+  // Form Mode: 'balance_topup' | 'missed_points' | 'deduction'
+  const [formMode, setFormMode] = useState<'balance_topup' | 'missed_points' | 'deduction'>('balance_topup');
   const [targetUser, setTargetUser] = useState<string>('all');
-  const [isDeduction, setIsDeduction] = useState(false);
-  const [points, setPoints] = useState('20');
-  const [amount, setAmount] = useState('0');
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [description, setDescription] = useState('Monthly meal point allocation');
+  const [amount, setAmount] = useState('15000');
+  const [points, setPoints] = useState('1');
+  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [description, setDescription] = useState('Monthly meal balance allocation');
 
   const fetchTopupData = async () => {
     try {
@@ -42,8 +46,12 @@ export default function AdminTopupPage() {
 
       const [uData, tData] = await Promise.all([uRes.json(), tRes.json()]);
 
-      if (uData.success) setUsers(uData.users || []);
-      if (tData.success) setTopups(tData.topups || []);
+      if (uData.success) {
+        setUsers(uData.users?.filter((u: any) => u.role === 'user') || []);
+      }
+      if (tData.success) {
+        setTopups(tData.topups || []);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -55,33 +63,79 @@ export default function AdminTopupPage() {
     fetchTopupData();
   }, []);
 
+  const handleModeChange = (mode: 'balance_topup' | 'missed_points' | 'deduction') => {
+    setFormMode(mode);
+    if (mode === 'balance_topup') {
+      setDescription('Monthly meal balance allocation');
+      setAmount('15000');
+      setPoints('0');
+    } else if (mode === 'missed_points') {
+      if (targetUser === 'all' && users.length > 0) {
+        setTargetUser(users[0]._id);
+      }
+      setDescription('Missed meal points adjustment');
+      setAmount('0');
+      setPoints('1');
+    } else if (mode === 'deduction') {
+      if (targetUser === 'all' && users.length > 0) {
+        setTargetUser(users[0]._id);
+      }
+      setDescription('Manual points deduction');
+      setAmount('0');
+      setPoints('1');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const parsedPts = Number(points);
-    if (!parsedPts || parsedPts <= 0) {
-      toast.error('Points must be a positive number');
+
+    if (formMode === 'missed_points' && targetUser === 'all') {
+      toast.error('Missed meal points adjustment must be assigned to an individual user.');
       return;
     }
 
-    if (isDeduction && !description) {
-      toast.error('A reason/description is required for point deductions.');
-      return;
-    }
+    let payload: any = {
+      userId: targetUser,
+      month,
+      description,
+      date,
+    };
 
-    const finalPoints = isDeduction ? -Math.abs(parsedPts) : Math.abs(parsedPts);
+    if (formMode === 'balance_topup') {
+      const parsedAmount = Number(amount);
+      if (!parsedAmount || parsedAmount <= 0) {
+        toast.error('Please enter a valid top-up amount.');
+        return;
+      }
+      payload.amount = parsedAmount;
+      payload.points = 0;
+      payload.type = 'topup';
+    } else if (formMode === 'missed_points') {
+      const parsedPoints = Number(points);
+      if (!parsedPoints || parsedPoints <= 0) {
+        toast.error('Please enter valid points (e.g. 1, 2, or 3).');
+        return;
+      }
+      payload.amount = 0;
+      payload.points = Math.abs(parsedPoints);
+      payload.type = 'points_adjustment';
+    } else if (formMode === 'deduction') {
+      const parsedPoints = Number(points);
+      if (!parsedPoints || parsedPoints <= 0) {
+        toast.error('Please enter valid points to deduct.');
+        return;
+      }
+      payload.amount = 0;
+      payload.points = -Math.abs(parsedPoints);
+      payload.type = 'points_adjustment';
+    }
 
     try {
       setSaving(true);
       const res = await fetch('/api/topup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: targetUser,
-          points: finalPoints,
-          amount: Number(amount) || 0,
-          month,
-          description,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -89,19 +143,19 @@ export default function AdminTopupPage() {
 
       toast.success(
         targetUser === 'all'
-          ? `Bulk allocated ${parsedPts} points to all users!`
-          : `${isDeduction ? 'Deducted' : 'Added'} ${parsedPts} points successfully!`
+          ? `Bulk top-up processed for all users!`
+          : `Transaction recorded successfully!`
       );
 
-      // Reset form
-      if (isDeduction) setIsDeduction(false);
       fetchTopupData();
     } catch (err: any) {
-      toast.error(err.message || 'Error processing topup');
+      toast.error(err.message || 'Error processing transaction');
     } finally {
       setSaving(false);
     }
   };
+
+  const selectedUserObj = users.find((u) => u._id === targetUser);
 
   return (
     <div className="pb-28 pt-2 px-4 max-w-4xl mx-auto">
@@ -111,7 +165,7 @@ export default function AdminTopupPage() {
           Top-up & Points Management
         </h1>
         <p className="text-xs text-gray-500 mt-0.5">
-          Allocate monthly meal points, perform bulk allocations, or make manual adjustments
+          Top up user monetary balances, add missed meal points, or perform bulk allocations.
         </p>
       </div>
 
@@ -122,29 +176,46 @@ export default function AdminTopupPage() {
             onSubmit={handleSubmit}
             className="bg-white p-6 rounded-3xl border border-[#F5E6D3] shadow-sm space-y-4"
           >
-            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-              <h3 className="font-extrabold text-sm text-[#1A1A2E]">
-                {isDeduction ? 'Manual Point Deduction' : 'Allocate Points'}
-              </h3>
-
-              {/* Mode Switcher */}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsDeduction(!isDeduction);
-                  if (!isDeduction && targetUser === 'all') {
-                    // Deduction can only be individual
-                    if (users.length > 0) setTargetUser(users[0]._id);
-                  }
-                }}
-                className={`text-[11px] font-bold px-2.5 py-1 rounded-xl transition ${
-                  isDeduction
-                    ? 'bg-red-100 text-red-600'
-                    : 'bg-[#27AE60]/10 text-[#27AE60]'
-                }`}
-              >
-                {isDeduction ? 'Switch to Top-up' : 'Manual Deduction Mode'}
-              </button>
+            {/* Mode Tabs */}
+            <div>
+              <label className="block text-xs font-bold text-[#1A1A2E] uppercase mb-1.5">
+                Action Type
+              </label>
+              <div className="grid grid-cols-3 gap-1 bg-[#FFF8F0] p-1 rounded-2xl border border-[#F5E6D3]">
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('balance_topup')}
+                  className={`py-2 px-1 text-[11px] font-bold rounded-xl transition ${
+                    formMode === 'balance_topup'
+                      ? 'bg-[#1A1A2E] text-white shadow-sm'
+                      : 'text-gray-600 hover:text-[#1A1A2E]'
+                  }`}
+                >
+                  Balance (LKR)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('missed_points')}
+                  className={`py-2 px-1 text-[11px] font-bold rounded-xl transition ${
+                    formMode === 'missed_points'
+                      ? 'bg-[#E67E22] text-white shadow-sm'
+                      : 'text-gray-600 hover:text-[#1A1A2E]'
+                  }`}
+                >
+                  + Add Points
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('deduction')}
+                  className={`py-2 px-1 text-[11px] font-bold rounded-xl transition ${
+                    formMode === 'deduction'
+                      ? 'bg-red-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:text-[#1A1A2E]'
+                  }`}
+                >
+                  - Deduct
+                </button>
+              </div>
             </div>
 
             {/* Recipient */}
@@ -157,100 +228,189 @@ export default function AdminTopupPage() {
                 onChange={(e) => setTargetUser(e.target.value)}
                 className="w-full p-2.5 bg-[#FFF8F0] border border-[#F5E6D3] rounded-2xl text-xs sm:text-sm font-semibold text-[#1A1A2E] focus:ring-2 focus:ring-[#E67E22]"
               >
-                {!isDeduction && (
+                {formMode === 'balance_topup' && (
                   <option value="all">🌟 All Active Users (Bulk Topup)</option>
                 )}
                 {users.map((u) => (
                   <option key={u._id} value={u._id}>
-                    {u.name} ({u.remainingPoints || 0} pts balance)
+                    {u.name} — Balance: LKR {(u.balance ?? 0).toLocaleString()} ({u.usedPoints || 0} pts used)
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Points & Amount */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Active User Balance Peek */}
+            {selectedUserObj && (
+              <div className="p-3 rounded-2xl bg-[#FFF8F0] border border-[#F5E6D3] text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500 font-semibold">Current Balance:</span>
+                  <span
+                    className={`font-black ${
+                      (selectedUserObj.balance ?? 0) <= 0 ? 'text-red-600' : 'text-[#27AE60]'
+                    }`}
+                  >
+                    LKR {(selectedUserObj.balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-gray-500">
+                  <span>Period Points Used:</span>
+                  <strong className="text-[#E67E22]">{selectedUserObj.usedPoints || 0} pts</strong>
+                </div>
+              </div>
+            )}
+
+            {/* Form Fields: Balance Topup Mode */}
+            {formMode === 'balance_topup' && (
               <div>
                 <label className="block text-xs font-bold text-[#1A1A2E] uppercase mb-1">
-                  Points {isDeduction ? 'to Deduct' : 'to Add'} *
+                  Top-up Monetary Amount (LKR) *
                 </label>
                 <div className="relative flex items-center">
-                  <Coins size={16} className="absolute left-3 text-gray-400" />
+                  <DollarSign size={16} className="absolute left-3 text-[#27AE60]" />
                   <input
                     type="number"
                     min="1"
                     required
-                    value={points}
-                    onChange={(e) => setPoints(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-[#FFF8F0]/60 border border-[#F5E6D3] rounded-2xl text-xs sm:text-sm font-bold text-[#1A1A2E] focus:ring-2 focus:ring-[#E67E22]"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="15000"
+                    className="w-full pl-9 pr-3 py-2.5 bg-[#FFF8F0]/60 border border-[#F5E6D3] rounded-2xl text-xs sm:text-sm font-black text-[#1A1A2E] focus:ring-2 focus:ring-[#E67E22]"
                   />
                 </div>
+                <div className="flex items-center gap-1.5 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setAmount('15000')}
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-[#FFF8F0] border border-[#F5E6D3] text-gray-700 hover:bg-gray-100"
+                  >
+                    15,000 LKR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAmount('10000')}
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-[#FFF8F0] border border-[#F5E6D3] text-gray-700 hover:bg-gray-100"
+                  >
+                    10,000 LKR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAmount('5000')}
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-[#FFF8F0] border border-[#F5E6D3] text-gray-700 hover:bg-gray-100"
+                  >
+                    5,000 LKR
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Form Fields: Missed Points / Deduction Mode */}
+            {(formMode === 'missed_points' || formMode === 'deduction') && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#1A1A2E] uppercase mb-1">
+                    Points {formMode === 'deduction' ? 'to Deduct' : 'to Add'} *
+                  </label>
+                  <div className="relative flex items-center">
+                    <Coins size={16} className="absolute left-3 text-[#E67E22]" />
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={points}
+                      onChange={(e) => setPoints(e.target.value)}
+                      placeholder="1"
+                      className="w-full pl-9 pr-3 py-2 bg-[#FFF8F0]/60 border border-[#F5E6D3] rounded-2xl text-xs sm:text-sm font-bold text-[#1A1A2E] focus:ring-2 focus:ring-[#E67E22]"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-gray-500 font-semibold">
+                    <span>Quick:</span>
+                    <button
+                      type="button"
+                      onClick={() => setPoints('1')}
+                      className="px-2 py-0.5 rounded bg-[#FFF8F0] border border-[#F5E6D3]"
+                    >
+                      +1 (Breakfast / Dinner)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPoints('2')}
+                      className="px-2 py-0.5 rounded bg-[#FFF8F0] border border-[#F5E6D3]"
+                    >
+                      +2 (Lunch)
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#1A1A2E] uppercase mb-1">
+                    Effective Meal Date
+                  </label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full p-2 bg-[#FFF8F0]/60 border border-[#F5E6D3] rounded-2xl text-xs font-bold text-[#1A1A2E] focus:ring-2 focus:ring-[#E67E22]"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Month & Description */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-[#1A1A2E] uppercase mb-1">
+                  Month
+                </label>
+                <input
+                  type="month"
+                  value={month}
+                  onChange={(e) => setMonth(e.target.value)}
+                  className="w-full p-2 bg-[#FFF8F0]/60 border border-[#F5E6D3] rounded-2xl text-xs font-bold text-[#1A1A2E] focus:ring-2 focus:ring-[#E67E22]"
+                />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[#1A1A2E] uppercase mb-1">
-                  Monetary Amount (LKR)
+                  Reason / Note *
                 </label>
-                <div className="relative flex items-center">
-                  <DollarSign size={16} className="absolute left-3 text-gray-400" />
-                  <input
-                    type="number"
-                    min="0"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-[#FFF8F0]/60 border border-[#F5E6D3] rounded-2xl text-xs sm:text-sm font-bold text-[#1A1A2E] focus:ring-2 focus:ring-[#E67E22]"
-                  />
-                </div>
+                <input
+                  type="text"
+                  required
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="e.g. Monthly Topup"
+                  className="w-full p-2 bg-[#FFF8F0]/60 border border-[#F5E6D3] rounded-2xl text-xs text-[#1A1A2E] focus:ring-2 focus:ring-[#E67E22]"
+                />
               </div>
-            </div>
-
-            {/* Month & Description */}
-            <div>
-              <label className="block text-xs font-bold text-[#1A1A2E] uppercase mb-1">
-                Allocation Month
-              </label>
-              <input
-                type="month"
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-                className="w-full p-2 bg-[#FFF8F0]/60 border border-[#F5E6D3] rounded-2xl text-xs font-bold text-[#1A1A2E] focus:ring-2 focus:ring-[#E67E22]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[#1A1A2E] uppercase mb-1">
-                Reason / Description *
-              </label>
-              <input
-                type="text"
-                required
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="e.g. Monthly allocation - March 2025"
-                className="w-full p-2.5 bg-[#FFF8F0]/60 border border-[#F5E6D3] rounded-2xl text-xs text-[#1A1A2E] focus:ring-2 focus:ring-[#E67E22]"
-              />
             </div>
 
             <button
               type="submit"
               disabled={saving}
               className={`w-full py-3.5 text-white text-xs sm:text-sm font-bold rounded-2xl shadow-md transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 ${
-                isDeduction
+                formMode === 'deduction'
                   ? 'bg-red-600 hover:bg-red-700'
+                  : formMode === 'missed_points'
+                  ? 'bg-[#E67E22] hover:bg-[#D35400]'
                   : 'bg-[#1A1A2E] hover:bg-black'
               }`}
             >
               {saving ? (
                 <span>Processing...</span>
-              ) : isDeduction ? (
+              ) : formMode === 'deduction' ? (
                 <>
                   <MinusCircle size={16} />
                   <span>Deduct Points</span>
                 </>
-              ) : (
+              ) : formMode === 'missed_points' ? (
                 <>
                   <PlusCircle size={16} />
-                  <span>Add Topup Allocation</span>
+                  <span>Add Missed Points</span>
+                </>
+              ) : (
+                <>
+                  <DollarSign size={16} />
+                  <span>Apply Balance Top-up</span>
                 </>
               )}
             </button>
@@ -262,15 +422,15 @@ export default function AdminTopupPage() {
           <div className="bg-white p-6 rounded-3xl border border-[#F5E6D3] shadow-sm">
             <h3 className="font-extrabold text-sm text-[#1A1A2E] mb-4 flex items-center gap-2">
               <History size={16} className="text-[#E67E22]" />
-              <span>Historical Top-up Log</span>
+              <span>Top-up & Points Audit Log</span>
             </h3>
 
             {loading ? (
-              <div className="text-center py-8 text-xs text-gray-500">Loading topups...</div>
+              <div className="text-center py-8 text-xs text-gray-500">Loading records...</div>
             ) : topups.length === 0 ? (
-              <p className="text-xs text-gray-400 py-6 text-center">No top-ups found.</p>
+              <p className="text-xs text-gray-400 py-6 text-center">No transaction logs found.</p>
             ) : (
-              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+              <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
                 {topups.map((t) => (
                   <div
                     key={t._id}
@@ -284,6 +444,11 @@ export default function AdminTopupPage() {
                         <span className="text-[10px] text-gray-400">
                           ({t.month})
                         </span>
+                        {t.type && (
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase bg-gray-100 text-gray-600">
+                            {t.type.replace('_', ' ')}
+                          </span>
+                        )}
                       </div>
                       <p className="text-gray-600 mt-0.5">{t.description}</p>
                       <span className="text-[10px] text-gray-400 block mt-0.5">
@@ -292,19 +457,25 @@ export default function AdminTopupPage() {
                     </div>
 
                     <div className="text-right">
-                      <span
-                        className={`font-black text-sm px-2.5 py-1 rounded-xl inline-block ${
-                          t.points >= 0
-                            ? 'bg-[#27AE60]/10 text-[#27AE60]'
-                            : 'bg-red-100 text-red-600'
-                        }`}
-                      >
-                        {t.points >= 0 ? `+${t.points}` : t.points} pts
-                      </span>
-                      {t.amount > 0 && (
-                        <div className="text-[10px] text-gray-500 font-semibold mt-0.5">
-                          {formatCurrency(t.amount)}
+                      {t.amount !== 0 && (
+                        <div
+                          className={`font-black text-sm ${
+                            t.amount > 0 ? 'text-[#27AE60]' : 'text-red-600'
+                          }`}
+                        >
+                          {t.amount > 0 ? `+${formatCurrency(t.amount)}` : formatCurrency(t.amount)}
                         </div>
+                      )}
+                      {t.points !== 0 && (
+                        <span
+                          className={`font-bold text-xs px-2 py-0.5 rounded-md inline-block mt-0.5 ${
+                            t.points > 0
+                              ? 'bg-[#E67E22]/10 text-[#E67E22]'
+                              : 'bg-red-100 text-red-600'
+                          }`}
+                        >
+                          {t.points > 0 ? `+${t.points}` : t.points} pts
+                        </span>
                       )}
                     </div>
                   </div>
@@ -317,4 +488,3 @@ export default function AdminTopupPage() {
     </div>
   );
 }
-

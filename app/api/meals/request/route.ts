@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import connectDB from '@/lib/db';
 import MealRequest from '@/lib/models/MealRequest';
+import User from '@/lib/models/User';
 import CutoffSettings from '@/lib/models/CutoffSettings';
 import AuditLog from '@/lib/models/AuditLog';
 import Holiday from '@/lib/models/Holiday';
@@ -44,6 +45,19 @@ export async function POST(req: Request) {
     const effectiveUserId = (isAdmin && targetUserId) ? targetUserId : (session.user as any).id;
 
     await connectDB();
+
+    // Check user document & negative balance restriction
+    const userDoc = await User.findById(effectiveUserId);
+    if (!userDoc) {
+      return NextResponse.json({ success: false, error: 'User not found.' }, { status: 404 });
+    }
+
+    if (!isAdmin && (userDoc.balance === undefined || userDoc.balance <= 0)) {
+      return NextResponse.json({
+        success: false,
+        error: `Cannot request meals: Your account balance is in deficit (LKR ${(userDoc.balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}). You cannot request meals until your balance is topped up by Admin.`,
+      }, { status: 403 });
+    }
 
     const queryDate = normalizeDate(new Date(date));
 

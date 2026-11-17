@@ -7,6 +7,8 @@ export interface IUser extends Document {
   password?: string;
   role: 'admin' | 'user' | 'cook';
   isActive: boolean;
+  balance: number; // Monetary balance in LKR (default 15,000)
+  startDate: Date; // Meal tracking start date
   biometricCredentialId?: string;
   biometricPublicKey?: string;
   profileImage?: string;
@@ -21,6 +23,8 @@ const UserSchema = new Schema<IUser>(
     password: { type: String, required: true },
     role: { type: String, enum: ['admin', 'user', 'cook'], default: 'user' },
     isActive: { type: Boolean, default: true },
+    balance: { type: Number, default: 15000 },
+    startDate: { type: Date, default: Date.now },
     biometricCredentialId: { type: String, default: null },
     biometricPublicKey: { type: String, default: null },
     profileImage: { type: String, default: '' },
