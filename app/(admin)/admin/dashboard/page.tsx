@@ -16,9 +16,12 @@ import {
   ArrowUpRight,
   ShieldCheck,
   CheckCircle2,
-  Calendar
+  Calendar,
+  WalletCards,
+  ArrowRight
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatCurrency } from '@/lib/utils';
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState({
@@ -29,7 +32,14 @@ export default function AdminDashboardPage() {
     todayTotalRequests: 0,
     monthlyPointsUsed: 0,
   });
-  const [recentLogs, setRecentLogs] = useState<any[]>([]);
+
+  const [treasury, setTreasury] = useState({
+    totalStaffBalance: 0,
+    currentAllocationBudget: 0,
+    availableBalance: 0,
+    staffCount: 0,
+  });
+
   const [cutoffs, setCutoffs] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -37,28 +47,25 @@ export default function AdminDashboardPage() {
     async function loadDashboard() {
       try {
         setLoading(true);
-
-        // 1. Fetch Users
-        const usersRes = await fetch('/api/users');
-        const usersData = await usersRes.json();
-
-        // 2. Fetch Today's Daily Report
         const todayStr = new Date().toISOString().split('T')[0];
-        const dailyRes = await fetch(`/api/reports?type=daily&date=${todayStr}`);
-        const dailyData = await dailyRes.json();
-
-        // 3. Fetch Cutoffs
-        const cutoffRes = await fetch('/api/settings/cutoff');
-        const cutoffData = await cutoffRes.json();
-
-        // 4. Fetch Audit Logs
-        const auditRes = await fetch('/api/audit');
-        const auditData = await auditRes.json();
-
-        // 5. Fetch Monthly points used
         const currentMonth = todayStr.slice(0, 7);
-        const mealsRes = await fetch(`/api/meals?all=true&month=${currentMonth}`);
-        const mealsData = await mealsRes.json();
+
+        const [usersRes, dailyRes, cutoffRes, treasuryRes, mealsRes] = await Promise.all([
+          fetch('/api/users'),
+          fetch(`/api/reports?type=daily&date=${todayStr}`),
+          fetch('/api/settings/cutoff'),
+          fetch('/api/admin/treasury'),
+          fetch(`/api/meals?all=true&month=${currentMonth}`),
+        ]);
+
+        const [usersData, dailyData, cutoffData, treasuryData, mealsData] = await Promise.all([
+          usersRes.json(),
+          dailyRes.json(),
+          cutoffRes.json(),
+          treasuryRes.json(),
+          mealsRes.json(),
+        ]);
+
         const monthlyPoints = (mealsData.requests || [])
           .filter((m: any) => m.status !== 'cancelled')
           .reduce((sum: number, m: any) => sum + (m.totalPoints || 0), 0);
@@ -72,8 +79,13 @@ export default function AdminDashboardPage() {
           monthlyPointsUsed: monthlyPoints,
         });
 
-        if (cutoffData.success) setCutoffs(cutoffData.settings);
-        if (auditData.success) setRecentLogs(auditData.logs || []);
+        if (treasuryData.success && treasuryData.treasury) {
+          setTreasury(treasuryData.treasury);
+        }
+
+        if (cutoffData.success) {
+          setCutoffs(cutoffData.settings);
+        }
       } catch (err) {
         console.error('Error loading admin dashboard:', err);
       } finally {
@@ -97,14 +109,93 @@ export default function AdminDashboardPage() {
           </h1>
         </div>
 
-        <Link
-          href="/admin/users/add"
-          className="py-2.5 px-4 bg-[#1A1A2E] hover:bg-black text-white text-xs font-bold rounded-2xl shadow-md flex items-center gap-1.5 transition"
-        >
-          <UserPlus size={16} />
-          <span>Add New User</span>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/treasury"
+            className="py-2.5 px-4 bg-[#FFF8F0] hover:bg-[#F5E6D3] border border-[#F5E6D3] text-[#1A1A2E] text-xs font-bold rounded-2xl shadow-xs flex items-center gap-1.5 transition"
+          >
+            <WalletCards size={15} className="text-[#E67E22]" />
+            <span>Money Summary</span>
+          </Link>
+
+          <Link
+            href="/admin/users/add"
+            className="py-2.5 px-4 bg-[#1A1A2E] hover:bg-black text-white text-xs font-bold rounded-2xl shadow-md flex items-center gap-1.5 transition"
+          >
+            <UserPlus size={16} />
+            <span>Add User</span>
+          </Link>
+        </div>
       </div>
+
+      {/* Chammery Treasury Money Card (Live User Balances - Budget = Available Reserve) */}
+      <motion.div
+        initial={{ y: 10, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="rounded-3xl p-5 sm:p-6 bg-gradient-to-br from-[#1A1A2E] via-[#2A1F44] to-[#1A1A2E] text-white shadow-xl relative overflow-hidden mb-6 border border-white/10"
+      >
+        <div className="absolute -right-8 -bottom-8 w-40 h-40 rounded-full bg-[#E67E22]/20 blur-3xl pointer-events-none" />
+
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <span className="text-xs font-bold text-[#FFDAB9] uppercase tracking-wider flex items-center gap-1.5">
+            <WalletCards size={15} className="text-[#E67E22]" />
+            Chammery Treasury & Money Summary
+          </span>
+
+          <Link
+            href="/admin/treasury"
+            className="text-xs font-bold text-[#FFDAB9] hover:underline flex items-center gap-1"
+          >
+            <span>View Full Breakdown</span>
+            <ArrowRight size={13} />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          {/* Box 1: Total Staff Balances Sum */}
+          <div className="p-3.5 rounded-2xl bg-white/10 border border-white/10">
+            <span className="text-[11px] font-bold text-gray-300 uppercase block">Total Staff Balances</span>
+            <span className="text-xl sm:text-2xl font-black text-white mt-1 block">
+              LKR {treasury.totalStaffBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </span>
+            <span className="text-[10px] text-gray-400 mt-0.5 block">
+              {treasury.staffCount} staff member funds
+            </span>
+          </div>
+
+          {/* Box 2: Month Allocation */}
+          <div className="p-3.5 rounded-2xl bg-white/10 border border-white/10">
+            <span className="text-[11px] font-bold text-amber-200 uppercase block">This Month Budget</span>
+            <span className="text-xl sm:text-2xl font-black text-amber-300 mt-1 block">
+              - LKR {treasury.currentAllocationBudget.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </span>
+            <span className="text-[10px] text-gray-400 mt-0.5 block">
+              Chammery allocated bill
+            </span>
+          </div>
+
+          {/* Box 3: Net Available Reserve */}
+          <div
+            className={`p-3.5 rounded-2xl border ${
+              treasury.availableBalance < 0
+                ? 'bg-red-500/20 border-red-500/30'
+                : 'bg-[#27AE60]/20 border-[#27AE60]/40'
+            }`}
+          >
+            <span className="text-[11px] font-bold text-gray-200 uppercase block">Available Reserve</span>
+            <span
+              className={`text-xl sm:text-2xl font-black mt-1 block ${
+                treasury.availableBalance < 0 ? 'text-red-400' : 'text-[#2ECC71]'
+              }`}
+            >
+              LKR {treasury.availableBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </span>
+            <span className="text-[10px] text-gray-300 mt-0.5 block">
+              {treasury.availableBalance < 0 ? 'Deficit / Needs Top-up' : 'Surplus Available'}
+            </span>
+          </div>
+        </div>
+      </motion.div>
 
       {/* KPI Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -189,7 +280,7 @@ export default function AdminDashboardPage() {
         </motion.div>
       </div>
 
-      {/* Today's Meal Summary Cards */}
+      {/* Today's Kitchen Production Summary */}
       <div className="bg-white p-6 rounded-3xl border border-[#F5E6D3] shadow-sm mb-6">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -247,17 +338,17 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Quick Navigation Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      {/* Navigation Quick Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Link
-          href="/admin/topup"
+          href="/admin/treasury"
           className="bg-white p-4 rounded-2xl border border-[#F5E6D3] hover:border-[#E67E22] shadow-sm transition flex flex-col items-center text-center group"
         >
-          <div className="w-10 h-10 rounded-xl bg-[#E67E22]/10 text-[#E67E22] group-hover:scale-110 flex items-center justify-center mb-2 transition">
-            <DollarSign size={20} />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1A1A2E] to-[#2C2C4E] text-white group-hover:scale-110 flex items-center justify-center mb-2 transition">
+            <WalletCards size={20} className="text-[#FFDAB9]" />
           </div>
-          <span className="text-xs font-bold text-[#1A1A2E]">Topup Points</span>
-          <span className="text-[10px] text-gray-500 mt-0.5">Bulk or single</span>
+          <span className="text-xs font-bold text-[#1A1A2E]">Money Summary</span>
+          <span className="text-[10px] text-gray-500 mt-0.5">Treasury & Balances</span>
         </Link>
 
         <Link
@@ -272,6 +363,17 @@ export default function AdminDashboardPage() {
         </Link>
 
         <Link
+          href="/admin/topup"
+          className="bg-white p-4 rounded-2xl border border-[#F5E6D3] hover:border-[#E67E22] shadow-sm transition flex flex-col items-center text-center group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-[#E67E22]/10 text-[#E67E22] group-hover:scale-110 flex items-center justify-center mb-2 transition">
+            <DollarSign size={20} />
+          </div>
+          <span className="text-xs font-bold text-[#1A1A2E]">Topup Points</span>
+          <span className="text-[10px] text-gray-500 mt-0.5">Bulk or single</span>
+        </Link>
+
+        <Link
           href="/admin/reports"
           className="bg-white p-4 rounded-2xl border border-[#F5E6D3] hover:border-[#E67E22] shadow-sm transition flex flex-col items-center text-center group"
         >
@@ -281,50 +383,7 @@ export default function AdminDashboardPage() {
           <span className="text-xs font-bold text-[#1A1A2E]">PDF Reports</span>
           <span className="text-[10px] text-gray-500 mt-0.5">Download & Export</span>
         </Link>
-
-        <Link
-          href="/admin/cutoff-settings"
-          className="bg-white p-4 rounded-2xl border border-[#F5E6D3] hover:border-[#E67E22] shadow-sm transition flex flex-col items-center text-center group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 group-hover:scale-110 flex items-center justify-center mb-2 transition">
-            <Sliders size={20} />
-          </div>
-          <span className="text-xs font-bold text-[#1A1A2E]">Cutoff Times</span>
-          <span className="text-[10px] text-gray-500 mt-0.5">Global timings</span>
-        </Link>
-      </div>
-
-      {/* Recent Activity / Audit Log */}
-      <div className="bg-white p-5 rounded-3xl border border-[#F5E6D3] shadow-sm">
-        <h3 className="font-extrabold text-sm text-[#1A1A2E] mb-3">
-          Recent Activity Feed (Audit Trail)
-        </h3>
-
-        {recentLogs.length === 0 ? (
-          <p className="text-xs text-gray-400 py-3 text-center">No recent activity recorded.</p>
-        ) : (
-          <div className="space-y-2.5 max-h-64 overflow-y-auto">
-            {recentLogs.slice(0, 8).map((log) => (
-              <div
-                key={log._id}
-                className="p-3 rounded-2xl bg-[#FFF8F0]/70 border border-[#F5E6D3]/60 flex items-start justify-between gap-3 text-xs"
-              >
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-[#1A1A2E]">{log.action}</span>
-                    <span className="text-[10px] text-[#8B4513] font-semibold">by {log.userName}</span>
-                  </div>
-                  <p className="text-gray-600 mt-0.5">{log.details}</p>
-                </div>
-                <span className="text-[10px] text-gray-400 whitespace-nowrap">
-                  {format(new Date(log.createdAt), 'MMM d, h:mm a')}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
 }
-

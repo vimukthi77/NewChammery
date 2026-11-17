@@ -40,6 +40,7 @@ export default function BottomNav() {
   // Admin navigation
   const adminNavItems = [
     { label: 'Home', href: '/admin/dashboard', icon: Home },
+    { label: 'Treasury', href: '/admin/treasury', icon: WalletCards },
     { label: 'Users', href: '/admin/users', icon: Users },
     { label: 'Requests', href: '/admin/meal-requests', icon: ClipboardList },
     { label: 'Topup', href: '/admin/topup', icon: DollarSign },
@@ -61,7 +62,7 @@ export default function BottomNav() {
         initial={{ y: 50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="pointer-events-auto flex items-center justify-around bg-[#1A1A2E]/95 backdrop-blur-md text-white px-4 py-2.5 rounded-full shadow-2xl border border-white/10 max-w-sm sm:max-w-md w-full"
+        className="pointer-events-auto flex items-center justify-around bg-[#1A1A2E]/95 backdrop-blur-md text-white px-2 sm:px-4 py-2 sm:py-2.5 rounded-full shadow-2xl border border-white/10 max-w-md sm:max-w-xl w-full"
       >
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -71,7 +72,7 @@ export default function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              className="relative flex flex-col items-center justify-center py-1 px-3 group"
+              className="relative flex flex-col items-center justify-center py-1 px-1.5 sm:px-3 group"
             >
               {isActive && (
                 <motion.div

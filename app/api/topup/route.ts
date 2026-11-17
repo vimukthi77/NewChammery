@@ -6,6 +6,8 @@ import Topup from '@/lib/models/Topup';
 import User from '@/lib/models/User';
 import AuditLog from '@/lib/models/AuditLog';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);

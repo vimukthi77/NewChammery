@@ -19,9 +19,12 @@ export default function CutoffSettingsPage() {
         setLoading(true);
         const res = await fetch('/api/settings/cutoff');
         if (!res.ok) {
-          throw new Error(`Failed to load cutoffs: ${res.statusText}`);
+          console.error(`Failed to load cutoffs: ${res.status} ${res.statusText}`);
+          return;
         }
-        const data = await res.json();
+        const text = await res.text();
+        if (!text) return;
+        const data = JSON.parse(text);
         if (data.success && data.settings) {
           setBreakfastTime(data.settings.breakfastCutoffTime || '07:00');
           setLunchTime(data.settings.lunchCutoffTime || '10:00');

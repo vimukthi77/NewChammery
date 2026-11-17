@@ -9,6 +9,8 @@ import Topup from '@/lib/models/Topup';
 import AuditLog from '@/lib/models/AuditLog';
 import { normalizeDate } from '@/lib/utils';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
