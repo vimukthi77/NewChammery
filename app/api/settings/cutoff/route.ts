@@ -5,7 +5,9 @@ import connectDB from '@/lib/db';
 import CutoffSettings from '@/lib/models/CutoffSettings';
 import AuditLog from '@/lib/models/AuditLog';
 
-export async function GET() {
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: Request) {
   try {
     await connectDB();
     let settings = await CutoffSettings.findOne();
@@ -22,7 +24,7 @@ export async function GET() {
   }
 }
 
-export async function PUT(req: Request) {
+async function handleUpdate(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session || (session.user as any)?.role !== 'admin') {
@@ -56,7 +58,15 @@ export async function PUT(req: Request) {
 
     return NextResponse.json({ success: true, settings });
   } catch (error: any) {
+    console.error('Cutoff update error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
 
+export async function PUT(req: Request) {
+  return handleUpdate(req);
+}
+
+export async function POST(req: Request) {
+  return handleUpdate(req);
+}

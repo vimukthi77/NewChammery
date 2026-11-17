@@ -18,6 +18,9 @@ export default function CutoffSettingsPage() {
       try {
         setLoading(true);
         const res = await fetch('/api/settings/cutoff');
+        if (!res.ok) {
+          throw new Error(`Failed to load cutoffs: ${res.statusText}`);
+        }
         const data = await res.json();
         if (data.success && data.settings) {
           setBreakfastTime(data.settings.breakfastCutoffTime || '07:00');
@@ -40,7 +43,7 @@ export default function CutoffSettingsPage() {
     try {
       setSaving(true);
       const res = await fetch('/api/settings/cutoff', {
-        method: 'PUT',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           breakfastCutoffTime: breakfastTime,
@@ -49,8 +52,17 @@ export default function CutoffSettingsPage() {
         }),
       });
 
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
+      const text = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(text || `Server returned ${res.status}: ${res.statusText}`);
+      }
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update cutoffs');
+      }
 
       toast.success('Cutoff times updated globally!');
       setUpdatedAt(new Date().toISOString());
