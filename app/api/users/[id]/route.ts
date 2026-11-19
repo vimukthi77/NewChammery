@@ -82,6 +82,9 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
     }
 
+    const oldBalance = typeof user.balance === 'number' ? user.balance : 0;
+    const isBalanceChanged = typeof balance === 'number' && balance !== oldBalance;
+
     if (name) user.name = name.trim();
     if (email) user.email = email.toLowerCase().trim();
     if (role && ['admin', 'user', 'cook'].includes(role)) user.role = role;
@@ -108,22 +111,44 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
     await user.save();
 
-    await AuditLog.create({
-      userId: (session.user as any).id,
-      userName: session.user?.name || 'Admin',
-      action: 'UPDATE_USER',
-      details: `Updated user ${user.name} (${user.email}). Reset password: ${resetPassword ? 'Yes' : 'No'}`,
-    });
+    if (isBalanceChanged) {
+      const diff = balance - oldBalance;
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      await Topup.create({
+        userId: user._id,
+        amount: diff,
+        points: 0,
+        type: diff >= 0 ? 'topup' : 'settlement_deduction',
+        month: currentMonth,
+        description: body.reason || `Admin updated balance from LKR ${oldBalance.toLocaleString()} to LKR ${balance.toLocaleString()}`,
+        addedBy: (session.user as any).id,
+      });
+
+      await AuditLog.create({
+        userId: (session.user as any).id,
+        userName: session.user?.name || 'Admin',
+        action: 'UPDATE_USER_BALANCE',
+        details: `Changed balance for ${user.name} (${user.email}) from LKR ${oldBalance} to LKR ${balance} (diff: ${diff >= 0 ? '+' : ''}${diff}). Reason: ${body.reason || 'Admin balance update'}`,
+      });
+    } else {
+      await AuditLog.create({
+        userId: (session.user as any).id,
+        userName: session.user?.name || 'Admin',
+        action: 'UPDATE_USER',
+        details: `Updated user ${user.name} (${user.email}). Reset password: ${resetPassword ? 'Yes' : 'No'}`,
+      });
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'User updated successfully',
+      message: isBalanceChanged ? `Balance updated to LKR ${user.balance.toLocaleString()}` : 'User updated successfully',
       user: {
         _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
         isActive: user.isActive,
+        balance: user.balance,
       },
       newPassword,
       emailSent,

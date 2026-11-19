@@ -83,6 +83,78 @@ export async function POST(req: Request) {
 
     await connectDB();
 
+    if (type === 'set_balance') {
+      const targetBalance = parsedAmount;
+      if (userId === 'all') {
+        const activeUsers = await User.find({ isActive: true, role: 'user' });
+        const topupDocs = activeUsers.map((u) => {
+          const old = typeof u.balance === 'number' ? u.balance : 0;
+          const diff = targetBalance - old;
+          return {
+            userId: u._id,
+            amount: diff,
+            points: 0,
+            type: diff >= 0 ? 'topup' : 'settlement_deduction',
+            month: currentMonth,
+            description: description || `Bulk set balance to LKR ${targetBalance.toLocaleString()}`,
+            addedBy: adminId,
+            createdAt: recordDate,
+          };
+        });
+
+        await Topup.insertMany(topupDocs);
+        await User.updateMany({ isActive: true, role: 'user' }, { $set: { balance: targetBalance } });
+
+        await AuditLog.create({
+          userId: adminId,
+          userName: session.user?.name || 'Admin',
+          action: 'BULK_SET_BALANCE',
+          details: `Directly set balance to LKR ${targetBalance.toLocaleString()} for all ${activeUsers.length} staff users. Note: ${description}`,
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: `Successfully set balance to LKR ${targetBalance.toLocaleString()} for ${activeUsers.length} users.`,
+        });
+      }
+
+      // Single user set balance
+      const targetUser = await User.findById(userId);
+      if (!targetUser) {
+        return NextResponse.json({ success: false, error: 'Target user not found.' }, { status: 404 });
+      }
+
+      const oldBal = typeof targetUser.balance === 'number' ? targetUser.balance : 0;
+      const diff = targetBalance - oldBal;
+      targetUser.balance = targetBalance;
+      await targetUser.save();
+
+      const newTopup = await Topup.create({
+        userId: targetUser._id,
+        amount: diff,
+        points: 0,
+        type: diff >= 0 ? 'topup' : 'settlement_deduction',
+        month: currentMonth,
+        description: description || `Admin set balance from LKR ${oldBal.toLocaleString()} to LKR ${targetBalance.toLocaleString()}`,
+        addedBy: adminId,
+        createdAt: recordDate,
+      });
+
+      await AuditLog.create({
+        userId: adminId,
+        userName: session.user?.name || 'Admin',
+        action: 'SET_USER_BALANCE',
+        details: `Set balance for ${targetUser.name} (${targetUser.email}) from LKR ${oldBal} to LKR ${targetBalance}. Diff: ${diff >= 0 ? '+' : ''}${diff}. Reason: ${description}`,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Balance for ${targetUser.name} set to LKR ${targetBalance.toLocaleString()}`,
+        newBalance: targetUser.balance,
+        topup: newTopup,
+      });
+    }
+
     if (userId === 'all') {
       // Bulk topup for all active users
       const activeUsers = await User.find({ isActive: true, role: 'user' });

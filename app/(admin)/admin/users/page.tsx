@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
   UserPlus,
@@ -14,7 +14,12 @@ import {
   Mail,
   Shield,
   RefreshCw,
-  Coins
+  Coins,
+  DollarSign,
+  Edit3,
+  X,
+  Sparkles,
+  ArrowRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -23,6 +28,12 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Change Balance Modal State
+  const [balanceModalUser, setBalanceModalUser] = useState<any>(null);
+  const [newBalanceInput, setNewBalanceInput] = useState<string>('');
+  const [balanceReason, setBalanceReason] = useState<string>('');
+  const [updatingBalance, setUpdatingBalance] = useState<boolean>(false);
 
   const fetchUsers = async () => {
     try {
@@ -110,6 +121,51 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleOpenBalanceModal = (user: any) => {
+    setBalanceModalUser(user);
+    setNewBalanceInput(String(user.balance ?? 15000));
+    setBalanceReason(`Admin balance adjustment for ${user.name}`);
+  };
+
+  const handleSaveBalance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!balanceModalUser) return;
+    const parsedBal = Number(newBalanceInput);
+    if (isNaN(parsedBal)) {
+      toast.error('Please enter a valid monetary number.');
+      return;
+    }
+
+    try {
+      setUpdatingBalance(true);
+      const res = await fetch(`/api/users/${balanceModalUser._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          balance: parsedBal,
+          reason: balanceReason || 'Admin direct balance update',
+        }),
+      });
+
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+
+      toast.success(
+        `Balance for ${balanceModalUser.name} changed to LKR ${parsedBal.toLocaleString('en-US', { minimumFractionDigits: 2 })}!`
+      );
+      setBalanceModalUser(null);
+      fetchUsers();
+    } catch (err: any) {
+      toast.error(err.message || 'Error updating user balance');
+    } finally {
+      setUpdatingBalance(false);
+    }
+  };
+
+  const currentDiff = balanceModalUser
+    ? Number(newBalanceInput || 0) - (balanceModalUser.balance ?? 0)
+    : 0;
+
   return (
     <div className="pb-28 pt-2 px-4 max-w-4xl mx-auto">
       {/* Header */}
@@ -195,17 +251,25 @@ export default function AdminUsersPage() {
                   {/* Balance & Points Breakdown */}
                   {user.role === 'user' && (
                     <div className="flex items-center gap-2 mt-2 text-[11px] flex-wrap">
-                      <span className="font-semibold text-gray-500">
+                      <span className="font-semibold text-gray-500 flex items-center gap-1">
                         Balance:{' '}
-                        <strong
-                          className={
-                            (user.balance ?? 0) <= 0
-                              ? 'text-red-600 font-extrabold bg-red-50 px-1.5 py-0.5 rounded border border-red-200'
-                              : 'text-[#27AE60] font-extrabold'
-                          }
+                        <button
+                          type="button"
+                          onClick={() => handleOpenBalanceModal(user)}
+                          className="group/bal inline-flex items-center gap-1 hover:opacity-80 transition cursor-pointer"
+                          title="Click to change monetary balance"
                         >
-                          LKR {(user.balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </strong>
+                          <strong
+                            className={
+                              (user.balance ?? 0) <= 0
+                                ? 'text-red-600 font-extrabold bg-red-50 px-1.5 py-0.5 rounded border border-red-200'
+                                : 'text-[#27AE60] font-extrabold'
+                            }
+                          >
+                            LKR {(user.balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </strong>
+                          <Edit3 size={11} className="text-gray-400 group-hover/bal:text-[#E67E22] transition" />
+                        </button>
                       </span>
                       <span>•</span>
                       <span className="font-semibold text-gray-500">
@@ -225,7 +289,19 @@ export default function AdminUsersPage() {
               </div>
 
               {/* Action buttons */}
-              <div className="flex items-center gap-2 self-end sm:self-center">
+              <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
+                {/* Change Balance button */}
+                {user.role === 'user' && (
+                  <button
+                    onClick={() => handleOpenBalanceModal(user)}
+                    className="p-2.5 rounded-xl bg-[#27AE60]/10 hover:bg-[#27AE60]/20 text-[#27AE60] text-xs font-bold flex items-center gap-1 border border-[#27AE60]/30 transition active:scale-95 shadow-xs"
+                    title="Change user monetary balance"
+                  >
+                    <DollarSign size={15} />
+                    <span>Change Balance</span>
+                  </button>
+                )}
+
                 {/* Reset password button */}
                 <button
                   onClick={() => handleResetPassword(user)}
@@ -264,6 +340,186 @@ export default function AdminUsersPage() {
           ))}
         </div>
       )}
+
+      {/* Change Balance Modal */}
+      <AnimatePresence>
+        {balanceModalUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-3xl border border-[#F5E6D3] shadow-2xl max-w-md w-full p-6 relative overflow-hidden"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-[#27AE60]/10 text-[#27AE60] flex items-center justify-center font-bold">
+                    <DollarSign size={18} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-base text-[#1A1A2E]">
+                      Change Money Balance
+                    </h3>
+                    <p className="text-[11px] text-gray-500">
+                      Directly edit staff monetary balance
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setBalanceModalUser(null)}
+                  className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Staff Member Card */}
+              <div className="p-3.5 rounded-2xl bg-[#FFF8F0] border border-[#F5E6D3] mb-4 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-[#1A1A2E] block">
+                    {balanceModalUser.name}
+                  </span>
+                  <span className="text-[11px] text-gray-500 block">
+                    {balanceModalUser.email}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-gray-400 block uppercase font-bold">
+                    Current Balance
+                  </span>
+                  <strong
+                    className={`text-sm font-black ${
+                      (balanceModalUser.balance ?? 0) <= 0 ? 'text-red-600' : 'text-[#27AE60]'
+                    }`}
+                  >
+                    LKR {(balanceModalUser.balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </strong>
+                </div>
+              </div>
+
+              <form onSubmit={handleSaveBalance} className="space-y-4">
+                {/* New Balance Input */}
+                <div>
+                  <label className="block text-xs font-bold text-[#1A1A2E] uppercase mb-1">
+                    New Monetary Balance (LKR) *
+                  </label>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3.5 text-xs font-bold text-gray-400">
+                      LKR
+                    </span>
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      value={newBalanceInput}
+                      onChange={(e) => setNewBalanceInput(e.target.value)}
+                      placeholder="e.g. 15000"
+                      className="w-full pl-12 pr-4 py-3 bg-[#FFF8F0]/50 border border-[#F5E6D3] rounded-2xl text-sm font-black text-[#1A1A2E] focus:outline-none focus:ring-2 focus:ring-[#27AE60]"
+                    />
+                  </div>
+                </div>
+
+                {/* Quick Presets */}
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
+                    Quick Presets
+                  </span>
+                  <div className="grid grid-cols-4 gap-1.5 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setNewBalanceInput('15000')}
+                      className="py-1.5 px-2 rounded-xl bg-[#FFF8F0] border border-[#F5E6D3] font-bold text-[#1A1A2E] hover:bg-[#F5E6D3] transition"
+                    >
+                      15,000
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewBalanceInput('20000')}
+                      className="py-1.5 px-2 rounded-xl bg-[#FFF8F0] border border-[#F5E6D3] font-bold text-[#1A1A2E] hover:bg-[#F5E6D3] transition"
+                    >
+                      20,000
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setNewBalanceInput(
+                          String((balanceModalUser.balance ?? 0) + 5000)
+                        )
+                      }
+                      className="py-1.5 px-2 rounded-xl bg-[#27AE60]/10 border border-[#27AE60]/30 font-bold text-[#27AE60] hover:bg-[#27AE60]/20 transition"
+                    >
+                      +5,000
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setNewBalanceInput(
+                          String((balanceModalUser.balance ?? 0) + 15000)
+                        )
+                      }
+                      className="py-1.5 px-2 rounded-xl bg-[#27AE60]/10 border border-[#27AE60]/30 font-bold text-[#27AE60] hover:bg-[#27AE60]/20 transition"
+                    >
+                      +15,000
+                    </button>
+                  </div>
+                </div>
+
+                {/* Net Change Difference Indicator */}
+                <div className="p-3 rounded-2xl bg-gray-50 border border-gray-200 text-xs flex items-center justify-between">
+                  <span className="text-gray-500 font-medium">Net Adjustment:</span>
+                  <strong
+                    className={`font-black ${
+                      currentDiff > 0
+                        ? 'text-[#27AE60]'
+                        : currentDiff < 0
+                        ? 'text-red-600'
+                        : 'text-gray-600'
+                    }`}
+                  >
+                    {currentDiff > 0 ? '+' : ''}LKR {currentDiff.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </strong>
+                </div>
+
+                {/* Reason Note */}
+                <div>
+                  <label className="block text-xs font-bold text-[#1A1A2E] uppercase mb-1">
+                    Reason / Audit Note
+                  </label>
+                  <input
+                    type="text"
+                    value={balanceReason}
+                    onChange={(e) => setBalanceReason(e.target.value)}
+                    placeholder="e.g. Manual top-up / correction"
+                    className="w-full p-2.5 bg-[#FFF8F0]/50 border border-[#F5E6D3] rounded-2xl text-xs text-[#1A1A2E] focus:outline-none focus:ring-2 focus:ring-[#27AE60]"
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setBalanceModalUser(null)}
+                    disabled={updatingBalance}
+                    className="flex-1 py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updatingBalance}
+                    className="flex-1 py-3 rounded-2xl bg-[#27AE60] hover:bg-[#219653] text-white text-xs font-bold shadow-md transition flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50"
+                  >
+                    <DollarSign size={15} />
+                    <span>{updatingBalance ? 'Saving...' : 'Save New Balance'}</span>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

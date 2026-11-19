@@ -27,8 +27,8 @@ export default function AdminTopupPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Form Mode: 'balance_topup' | 'missed_points' | 'deduction'
-  const [formMode, setFormMode] = useState<'balance_topup' | 'missed_points' | 'deduction'>('balance_topup');
+  // Form Mode: 'balance_topup' | 'set_balance' | 'missed_points' | 'deduction'
+  const [formMode, setFormMode] = useState<'balance_topup' | 'set_balance' | 'missed_points' | 'deduction'>('balance_topup');
   const [targetUser, setTargetUser] = useState<string>('all');
   const [amount, setAmount] = useState('15000');
   const [points, setPoints] = useState('1');
@@ -63,10 +63,14 @@ export default function AdminTopupPage() {
     fetchTopupData();
   }, []);
 
-  const handleModeChange = (mode: 'balance_topup' | 'missed_points' | 'deduction') => {
+  const handleModeChange = (mode: 'balance_topup' | 'set_balance' | 'missed_points' | 'deduction') => {
     setFormMode(mode);
     if (mode === 'balance_topup') {
       setDescription('Monthly meal balance allocation');
+      setAmount('15000');
+      setPoints('0');
+    } else if (mode === 'set_balance') {
+      setDescription('Admin direct balance adjustment');
       setAmount('15000');
       setPoints('0');
     } else if (mode === 'missed_points') {
@@ -89,8 +93,8 @@ export default function AdminTopupPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (formMode === 'missed_points' && targetUser === 'all') {
-      toast.error('Missed meal points adjustment must be assigned to an individual user.');
+    if ((formMode === 'missed_points' || formMode === 'deduction') && targetUser === 'all') {
+      toast.error('Points adjustments must be assigned to an individual user.');
       return;
     }
 
@@ -103,13 +107,22 @@ export default function AdminTopupPage() {
 
     if (formMode === 'balance_topup') {
       const parsedAmount = Number(amount);
-      if (!parsedAmount || parsedAmount <= 0) {
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
         toast.error('Please enter a valid top-up amount.');
         return;
       }
       payload.amount = parsedAmount;
       payload.points = 0;
       payload.type = 'topup';
+    } else if (formMode === 'set_balance') {
+      const parsedAmount = Number(amount);
+      if (isNaN(parsedAmount)) {
+        toast.error('Please enter a valid balance amount.');
+        return;
+      }
+      payload.amount = parsedAmount;
+      payload.points = 0;
+      payload.type = 'set_balance';
     } else if (formMode === 'missed_points') {
       const parsedPoints = Number(points);
       if (!parsedPoints || parsedPoints <= 0) {
@@ -181,33 +194,44 @@ export default function AdminTopupPage() {
               <label className="block text-xs font-bold text-[#1A1A2E] uppercase mb-1.5">
                 Action Type
               </label>
-              <div className="grid grid-cols-3 gap-1 bg-[#FFF8F0] p-1 rounded-2xl border border-[#F5E6D3]">
+              <div className="grid grid-cols-4 gap-1 bg-[#FFF8F0] p-1 rounded-2xl border border-[#F5E6D3]">
                 <button
                   type="button"
                   onClick={() => handleModeChange('balance_topup')}
-                  className={`py-2 px-1 text-[11px] font-bold rounded-xl transition ${
+                  className={`py-2 px-1 text-[10px] sm:text-[11px] font-bold rounded-xl transition ${
                     formMode === 'balance_topup'
+                      ? 'bg-[#27AE60] text-white shadow-sm'
+                      : 'text-gray-600 hover:text-[#1A1A2E]'
+                  }`}
+                >
+                  + Topup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('set_balance')}
+                  className={`py-2 px-1 text-[10px] sm:text-[11px] font-bold rounded-xl transition ${
+                    formMode === 'set_balance'
                       ? 'bg-[#1A1A2E] text-white shadow-sm'
                       : 'text-gray-600 hover:text-[#1A1A2E]'
                   }`}
                 >
-                  Balance (LKR)
+                  = Set Bal
                 </button>
                 <button
                   type="button"
                   onClick={() => handleModeChange('missed_points')}
-                  className={`py-2 px-1 text-[11px] font-bold rounded-xl transition ${
+                  className={`py-2 px-1 text-[10px] sm:text-[11px] font-bold rounded-xl transition ${
                     formMode === 'missed_points'
                       ? 'bg-[#E67E22] text-white shadow-sm'
                       : 'text-gray-600 hover:text-[#1A1A2E]'
                   }`}
                 >
-                  + Add Points
+                  + Points
                 </button>
                 <button
                   type="button"
                   onClick={() => handleModeChange('deduction')}
-                  className={`py-2 px-1 text-[11px] font-bold rounded-xl transition ${
+                  className={`py-2 px-1 text-[10px] sm:text-[11px] font-bold rounded-xl transition ${
                     formMode === 'deduction'
                       ? 'bg-red-600 text-white shadow-sm'
                       : 'text-gray-600 hover:text-[#1A1A2E]'
@@ -228,8 +252,8 @@ export default function AdminTopupPage() {
                 onChange={(e) => setTargetUser(e.target.value)}
                 className="w-full p-2.5 bg-[#FFF8F0] border border-[#F5E6D3] rounded-2xl text-xs sm:text-sm font-semibold text-[#1A1A2E] focus:ring-2 focus:ring-[#E67E22]"
               >
-                {formMode === 'balance_topup' && (
-                  <option value="all">🌟 All Active Users (Bulk Topup)</option>
+                {(formMode === 'balance_topup' || formMode === 'set_balance') && (
+                  <option value="all">🌟 All Active Users (Bulk {formMode === 'set_balance' ? 'Set Balance' : 'Topup'})</option>
                 )}
                 {users.map((u) => (
                   <option key={u._id} value={u._id}>
@@ -263,7 +287,7 @@ export default function AdminTopupPage() {
             {formMode === 'balance_topup' && (
               <div>
                 <label className="block text-xs font-bold text-[#1A1A2E] uppercase mb-1">
-                  Top-up Monetary Amount (LKR) *
+                  Top-up Monetary Amount to Add (LKR) *
                 </label>
                 <div className="relative flex items-center">
                   <DollarSign size={16} className="absolute left-3 text-[#27AE60]" />
@@ -277,7 +301,7 @@ export default function AdminTopupPage() {
                     className="w-full pl-9 pr-3 py-2.5 bg-[#FFF8F0]/60 border border-[#F5E6D3] rounded-2xl text-xs sm:text-sm font-black text-[#1A1A2E] focus:ring-2 focus:ring-[#E67E22]"
                   />
                 </div>
-                <div className="flex items-center gap-1.5 mt-2">
+                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                   <button
                     type="button"
                     onClick={() => setAmount('15000')}
@@ -298,6 +322,57 @@ export default function AdminTopupPage() {
                     className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-[#FFF8F0] border border-[#F5E6D3] text-gray-700 hover:bg-gray-100"
                   >
                     5,000 LKR
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Form Fields: Set Exact Balance Mode */}
+            {formMode === 'set_balance' && (
+              <div>
+                <label className="block text-xs font-bold text-[#1A1A2E] uppercase mb-1">
+                  Target Exact Balance (LKR) *
+                </label>
+                <div className="relative flex items-center">
+                  <DollarSign size={16} className="absolute left-3 text-[#1A1A2E]" />
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="15000"
+                    className="w-full pl-9 pr-3 py-2.5 bg-[#FFF8F0]/60 border border-[#F5E6D3] rounded-2xl text-xs sm:text-sm font-black text-[#1A1A2E] focus:ring-2 focus:ring-[#1A1A2E]"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setAmount('15000')}
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-[#FFF8F0] border border-[#F5E6D3] text-gray-700 hover:bg-gray-100"
+                  >
+                    Set 15,000 LKR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAmount('20000')}
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-[#FFF8F0] border border-[#F5E6D3] text-gray-700 hover:bg-gray-100"
+                  >
+                    Set 20,000 LKR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAmount('10000')}
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-[#FFF8F0] border border-[#F5E6D3] text-gray-700 hover:bg-gray-100"
+                  >
+                    Set 10,000 LKR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAmount('0')}
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-red-50 border border-red-200 text-red-600 hover:bg-red-100"
+                  >
+                    Reset 0 LKR
                   </button>
                 </div>
               </div>
@@ -392,7 +467,9 @@ export default function AdminTopupPage() {
                   ? 'bg-red-600 hover:bg-red-700'
                   : formMode === 'missed_points'
                   ? 'bg-[#E67E22] hover:bg-[#D35400]'
-                  : 'bg-[#1A1A2E] hover:bg-black'
+                  : formMode === 'set_balance'
+                  ? 'bg-[#1A1A2E] hover:bg-black'
+                  : 'bg-[#27AE60] hover:bg-[#219653]'
               }`}
             >
               {saving ? (
@@ -406,6 +483,11 @@ export default function AdminTopupPage() {
                 <>
                   <PlusCircle size={16} />
                   <span>Add Missed Points</span>
+                </>
+              ) : formMode === 'set_balance' ? (
+                <>
+                  <DollarSign size={16} />
+                  <span>Save Exact Balance</span>
                 </>
               ) : (
                 <>

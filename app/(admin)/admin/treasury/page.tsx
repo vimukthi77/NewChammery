@@ -36,6 +36,7 @@ export default function AdminTreasuryPage() {
 
   // Topup Modal State
   const [topupModalUser, setTopupModalUser] = useState<any>(null); // null = closed, 'all' = bulk, userObj = single
+  const [topupActionType, setTopupActionType] = useState<'topup' | 'set_balance'>('topup');
   const [topupAmount, setTopupAmount] = useState('15000');
   const [topupDesc, setTopupDesc] = useState('Monthly meal balance allocation');
   const [submittingTopup, setSubmittingTopup] = useState(false);
@@ -65,20 +66,21 @@ export default function AdminTreasuryPage() {
     fetchTreasury();
   }, [month]);
 
-  const handleOpenTopup = (target: any) => {
+  const handleOpenTopup = (target: any, actionType: 'topup' | 'set_balance' = 'topup') => {
     setTopupModalUser(target);
-    setTopupAmount('15000');
+    setTopupActionType(actionType);
+    setTopupAmount(actionType === 'set_balance' && target !== 'all' ? String(target.balance ?? 15000) : '15000');
     setTopupDesc(
       target === 'all'
-        ? `Bulk monthly balance allocation - ${month}`
-        : `Balance top-up for ${target.name}`
+        ? (actionType === 'set_balance' ? `Bulk set balance to allocation - ${month}` : `Bulk monthly balance allocation - ${month}`)
+        : (actionType === 'set_balance' ? `Set exact balance for ${target.name}` : `Balance top-up for ${target.name}`)
     );
   };
 
   const handleExecuteTopup = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsedAmount = Number(topupAmount);
-    if (!parsedAmount || parsedAmount <= 0) {
+    if (isNaN(parsedAmount) || (topupActionType === 'topup' && parsedAmount <= 0)) {
       toast.error('Please enter a valid monetary amount.');
       return;
     }
@@ -92,7 +94,7 @@ export default function AdminTreasuryPage() {
           userId: topupModalUser === 'all' ? 'all' : topupModalUser._id,
           amount: parsedAmount,
           points: 0,
-          type: 'topup',
+          type: topupActionType,
           month,
           description: topupDesc,
         }),
@@ -101,16 +103,24 @@ export default function AdminTreasuryPage() {
       const resData = await res.json();
       if (!resData.success) throw new Error(resData.error);
 
-      toast.success(
-        topupModalUser === 'all'
-          ? `Bulk top-up of ${formatCurrency(parsedAmount)} applied to all staff!`
-          : `Top-up of ${formatCurrency(parsedAmount)} added for ${topupModalUser.name}!`
-      );
+      if (topupActionType === 'set_balance') {
+        toast.success(
+          topupModalUser === 'all'
+            ? `Bulk balance set to ${formatCurrency(parsedAmount)} for all staff!`
+            : `Balance for ${topupModalUser.name} set to ${formatCurrency(parsedAmount)}!`
+        );
+      } else {
+        toast.success(
+          topupModalUser === 'all'
+            ? `Bulk top-up of ${formatCurrency(parsedAmount)} applied to all staff!`
+            : `Top-up of ${formatCurrency(parsedAmount)} added for ${topupModalUser.name}!`
+        );
+      }
 
       setTopupModalUser(null);
       fetchTreasury(true);
     } catch (err: any) {
-      toast.error(err.message || 'Error processing top-up');
+      toast.error(err.message || 'Error processing treasury action');
     } finally {
       setSubmittingTopup(false);
     }
@@ -476,12 +486,22 @@ export default function AdminTreasuryPage() {
                             </span>
                           </td>
                           <td className="py-3 px-3 text-center">
-                            <button
-                              onClick={() => handleOpenTopup(u)}
-                              className="text-[10px] font-bold px-2.5 py-1 bg-[#1A1A2E] hover:bg-black text-white rounded-xl shadow-xs transition"
-                            >
-                              Top Up
-                            </button>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => handleOpenTopup(u, 'topup')}
+                                className="text-[10px] font-bold px-2 py-1 bg-[#27AE60]/10 hover:bg-[#27AE60]/20 text-[#27AE60] rounded-xl border border-[#27AE60]/30 transition"
+                                title="Add monetary top-up to balance"
+                              >
+                                + Top Up
+                              </button>
+                              <button
+                                onClick={() => handleOpenTopup(u, 'set_balance')}
+                                className="text-[10px] font-bold px-2 py-1 bg-[#1A1A2E] hover:bg-black text-white rounded-xl shadow-xs transition"
+                                title="Change or set exact balance"
+                              >
+                                Change
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -509,10 +529,43 @@ export default function AdminTreasuryPage() {
                   <DollarSign size={18} className="text-[#27AE60]" />
                   <span>
                     {topupModalUser === 'all'
-                      ? 'Bulk Top-up for All Active Staff'
-                      : `Top Up ${topupModalUser.name}`}
+                      ? (topupActionType === 'set_balance' ? 'Bulk Set Balance for All Staff' : 'Bulk Top-up for All Staff')
+                      : (topupActionType === 'set_balance' ? `Change Balance: ${topupModalUser.name}` : `Top Up ${topupModalUser.name}`)}
                   </span>
                 </h3>
+              </div>
+
+              {/* Mode Toggle */}
+              <div className="grid grid-cols-2 gap-1 bg-[#FFF8F0] p-1 rounded-2xl border border-[#F5E6D3] mb-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTopupActionType('topup');
+                    setTopupDesc(topupModalUser === 'all' ? `Bulk monthly balance allocation - ${month}` : `Balance top-up for ${topupModalUser.name}`);
+                  }}
+                  className={`py-2 text-xs font-bold rounded-xl transition ${
+                    topupActionType === 'topup'
+                      ? 'bg-[#27AE60] text-white shadow-xs'
+                      : 'text-gray-600 hover:text-[#1A1A2E]'
+                  }`}
+                >
+                  + Add Top-Up
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTopupActionType('set_balance');
+                    setTopupAmount(topupModalUser !== 'all' ? String(topupModalUser.balance ?? 15000) : '15000');
+                    setTopupDesc(topupModalUser === 'all' ? `Bulk set balance to allocation - ${month}` : `Set exact balance for ${topupModalUser.name}`);
+                  }}
+                  className={`py-2 text-xs font-bold rounded-xl transition ${
+                    topupActionType === 'set_balance'
+                      ? 'bg-[#1A1A2E] text-white shadow-xs'
+                      : 'text-gray-600 hover:text-[#1A1A2E]'
+                  }`}
+                >
+                  = Set Exact Balance
+                </button>
               </div>
 
               <form onSubmit={handleExecuteTopup} className="space-y-4">
@@ -529,13 +582,13 @@ export default function AdminTreasuryPage() {
 
                 <div>
                   <label className="block text-xs font-bold text-[#1A1A2E] uppercase mb-1">
-                    Top-up Amount (LKR) *
+                    {topupActionType === 'set_balance' ? 'Target Exact Balance (LKR) *' : 'Top-up Amount to Add (LKR) *'}
                   </label>
                   <div className="relative flex items-center">
                     <DollarSign size={16} className="absolute left-3 text-[#27AE60]" />
                     <input
                       type="number"
-                      min="1"
+                      step="any"
                       required
                       value={topupAmount}
                       onChange={(e) => setTopupAmount(e.target.value)}
@@ -543,13 +596,20 @@ export default function AdminTreasuryPage() {
                       className="w-full pl-9 pr-3 py-2.5 bg-[#FFF8F0]/60 border border-[#F5E6D3] rounded-2xl text-sm font-black text-[#1A1A2E] focus:ring-2 focus:ring-[#E67E22] focus:outline-none"
                     />
                   </div>
-                  <div className="flex items-center gap-1.5 mt-2">
+                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                     <button
                       type="button"
                       onClick={() => setTopupAmount('15000')}
                       className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-[#FFF8F0] border border-[#F5E6D3] text-gray-700 hover:bg-gray-100"
                     >
                       15,000 LKR
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTopupAmount('20000')}
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-[#FFF8F0] border border-[#F5E6D3] text-gray-700 hover:bg-gray-100"
+                    >
+                      20,000 LKR
                     </button>
                     <button
                       type="button"
@@ -594,7 +654,7 @@ export default function AdminTreasuryPage() {
                     disabled={submittingTopup}
                     className="flex-1 py-3 bg-[#1A1A2E] hover:bg-black text-white text-xs font-bold rounded-2xl shadow-md transition disabled:opacity-50"
                   >
-                    {submittingTopup ? 'Applying...' : 'Confirm Top-Up'}
+                    {submittingTopup ? 'Applying...' : topupActionType === 'set_balance' ? 'Save Exact Balance' : 'Confirm Top-Up'}
                   </button>
                 </div>
               </form>
