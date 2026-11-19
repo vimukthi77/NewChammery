@@ -115,14 +115,19 @@ export async function POST(req: Request) {
 
       const mealPoints = mealAgg[0]?.pts || 0;
 
-      // Also check any manual points adjustments recorded in Topup within this period
+      // Also check any manual points adjustments recorded in Topup within this period or month
       const startMonth = startDate.toISOString().slice(0, 7);
+      const endMonth = endDate.toISOString().slice(0, 7);
       const topupAdjustAgg = await Topup.aggregate([
         {
           $match: {
             userId: staff._id,
             type: 'points_adjustment',
-            createdAt: { $gte: startDate, $lte: endDate },
+            $or: [
+              { createdAt: { $gte: startDate, $lte: endDate } },
+              { month: startMonth },
+              { month: endMonth },
+            ],
           },
         },
         { $group: { _id: null, pts: { $sum: '$points' } } },

@@ -10,6 +10,8 @@ import AuditLog from '@/lib/models/AuditLog';
 import { generateSecurePassword } from '@/lib/utils';
 import { sendWelcomeEmail } from '@/lib/email';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(authOptions);
@@ -32,10 +34,16 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     const meals = await MealRequest.find({ userId: id }).sort({ date: -1 }).limit(100);
     const topups = await Topup.find({ userId: id }).sort({ createdAt: -1 });
 
-    const totalAllocated = topups.reduce((acc, curr) => acc + (curr.points || 0), 0);
-    const totalUsed = meals
+    const adjPoints = topups
+      .filter((t) => t.type === 'points_adjustment')
+      .reduce((acc, curr) => acc + (curr.points || 0), 0);
+    const mealPointsUsed = meals
       .filter((m) => m.status !== 'cancelled')
       .reduce((acc, curr) => acc + (curr.totalPoints || 0), 0);
+    const totalUsed = Math.max(0, mealPointsUsed + adjPoints);
+    const totalAllocated = topups
+      .filter((t) => t.type !== 'points_adjustment')
+      .reduce((acc, curr) => acc + (curr.points || 0), 0);
     const pointBalance = totalAllocated - totalUsed;
     const monetaryBalance = typeof user.balance === 'number' ? user.balance : 0;
 
@@ -66,7 +74,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
     const { id } = params;
     const body = await req.json();
-    const { name, email, role, isActive, balance, resetPassword } = body;
+    const { name, email, role, isActive, balance, resetPassword, startDate } = body;
 
     await connectDB();
     const user = await User.findById(id);
@@ -79,6 +87,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     if (role && ['admin', 'user', 'cook'].includes(role)) user.role = role;
     if (typeof isActive === 'boolean') user.isActive = isActive;
     if (typeof balance === 'number') user.balance = balance;
+    if (startDate) user.startDate = new Date(startDate);
 
     let newPassword = null;
     let emailSent = false;

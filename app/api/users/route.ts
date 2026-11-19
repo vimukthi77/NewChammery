@@ -10,6 +10,8 @@ import AuditLog from '@/lib/models/AuditLog';
 import { generateSecurePassword } from '@/lib/utils';
 import { sendWelcomeEmail } from '@/lib/email';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -35,6 +37,8 @@ export async function GET(req: Request) {
 
     const users = await User.find(query).sort({ createdAt: -1 }).select('-password');
 
+    const monthParam = searchParams.get('month');
+
     // Aggregate points for each user
     const usersWithStats = await Promise.all(
       users.map(async (u) => {
@@ -46,9 +50,25 @@ export async function GET(req: Request) {
         const allocatedPoints = topups[0]?.totalPoints || 0;
         const totalTopupAmount = topups[0]?.totalAmount || 0;
 
+        // Points adjustments recorded in Topup
+        const adjMatch: any = { userId: u._id, type: 'points_adjustment' };
+        if (monthParam) {
+          adjMatch.month = monthParam;
+        }
+        const topupAdjustments = await Topup.aggregate([
+          { $match: adjMatch },
+          { $group: { _id: null, totalAdjustPoints: { $sum: '$points' } } },
+        ]);
+        const adjustmentPoints = topupAdjustments[0]?.totalAdjustPoints || 0;
+
         // Meal requests points from user's startDate or all active
         const mealQuery: any = { userId: u._id, status: { $ne: 'cancelled' } };
-        if (u.startDate) {
+        if (monthParam) {
+          const [yr, mo] = monthParam.split('-').map(Number);
+          const startMo = new Date(Date.UTC(yr, mo - 1, 1, 0, 0, 0));
+          const endMo = new Date(Date.UTC(yr, mo, 0, 23, 59, 59));
+          mealQuery.date = { $gte: startMo, $lte: endMo };
+        } else if (u.startDate) {
           mealQuery.date = { $gte: u.startDate };
         }
 
@@ -56,7 +76,8 @@ export async function GET(req: Request) {
           { $match: mealQuery },
           { $group: { _id: null, totalPoints: { $sum: '$totalPoints' } } },
         ]);
-        const usedPoints = meals[0]?.totalPoints || 0;
+        const mealPoints = meals[0]?.totalPoints || 0;
+        const usedPoints = Math.max(0, mealPoints + adjustmentPoints);
         const remainingPoints = allocatedPoints - usedPoints;
 
         return {
@@ -64,6 +85,8 @@ export async function GET(req: Request) {
           balance: typeof u.balance === 'number' ? u.balance : totalTopupAmount,
           allocatedPoints,
           usedPoints,
+          mealPoints,
+          adjustmentPoints,
           remainingPoints,
           totalTopupAmount,
         };

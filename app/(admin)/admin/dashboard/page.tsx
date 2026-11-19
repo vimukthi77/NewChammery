@@ -31,6 +31,9 @@ export default function AdminDashboardPage() {
     todayDinner: 0,
     todayTotalRequests: 0,
     monthlyPointsUsed: 0,
+    allPointsToToday: 0,
+    mealPointsToToday: 0,
+    adjustmentPointsToToday: 0,
   });
 
   const [treasury, setTreasury] = useState({
@@ -38,6 +41,9 @@ export default function AdminDashboardPage() {
     currentAllocationBudget: 0,
     availableBalance: 0,
     staffCount: 0,
+    allPointsToToday: 0,
+    totalPointsThisMonth: 0,
+    estimatedPointPrice: 0,
   });
 
   const [cutoffs, setCutoffs] = useState<any>(null);
@@ -66,9 +72,14 @@ export default function AdminDashboardPage() {
           mealsRes.json(),
         ]);
 
-        const monthlyPoints = (mealsData.requests || [])
+        const monthlyMealPoints = (mealsData.requests || [])
           .filter((m: any) => m.status !== 'cancelled')
           .reduce((sum: number, m: any) => sum + (m.totalPoints || 0), 0);
+        const monthlyTotalPoints = monthlyMealPoints + (mealsData.totalAdjustmentPoints || 0);
+
+        const totalPointsToToday = treasuryData?.treasury?.allPointsToToday ?? monthlyTotalPoints;
+        const totalMealPts = treasuryData?.treasury?.allMealPointsToToday ?? monthlyMealPoints;
+        const totalAdjPts = treasuryData?.treasury?.allAdjustmentPointsToToday ?? (mealsData.totalAdjustmentPoints || 0);
 
         setStats({
           totalUsers: usersData.users ? usersData.users.length : 0,
@@ -76,7 +87,10 @@ export default function AdminDashboardPage() {
           todayLunch: dailyData.counts ? dailyData.counts.lunch : 0,
           todayDinner: dailyData.counts ? dailyData.counts.dinner : 0,
           todayTotalRequests: dailyData.counts ? dailyData.counts.totalPoints : 0,
-          monthlyPointsUsed: monthlyPoints,
+          monthlyPointsUsed: treasuryData?.treasury?.totalPointsThisMonth ?? monthlyTotalPoints,
+          allPointsToToday: totalPointsToToday,
+          mealPointsToToday: totalMealPts,
+          adjustmentPointsToToday: totalAdjPts,
         });
 
         if (treasuryData.success && treasuryData.treasury) {
@@ -151,7 +165,7 @@ export default function AdminDashboardPage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
           {/* Box 1: Total Staff Balances Sum */}
           <div className="p-3.5 rounded-2xl bg-white/10 border border-white/10">
             <span className="text-[11px] font-bold text-gray-300 uppercase block">Total Staff Balances</span>
@@ -192,6 +206,20 @@ export default function AdminDashboardPage() {
             </span>
             <span className="text-[10px] text-gray-300 mt-0.5 block">
               {treasury.availableBalance < 0 ? 'Deficit / Needs Top-up' : 'Surplus Available'}
+            </span>
+          </div>
+
+          {/* Box 4: All Points Count to Today */}
+          <div className="p-3.5 rounded-2xl bg-white/10 border border-white/10">
+            <span className="text-[11px] font-bold text-[#FFDAB9] uppercase block flex items-center justify-between">
+              <span>All Points to Today</span>
+              <span className="text-[9px] bg-[#E67E22] text-white px-1.5 py-0.2 rounded font-bold">TOTAL</span>
+            </span>
+            <span className="text-xl sm:text-2xl font-black text-white mt-1 block">
+              {stats.allPointsToToday} <span className="text-sm font-semibold text-[#FFDAB9]">pts</span>
+            </span>
+            <span className="text-[10px] text-gray-300 mt-0.5 block">
+              Est. 1 pt = LKR {treasury.estimatedPointPrice > 0 ? treasury.estimatedPointPrice.toFixed(2) : '0.00'}
             </span>
           </div>
         </div>
@@ -252,7 +280,7 @@ export default function AdminDashboardPage() {
           </div>
         </motion.div>
 
-        {/* Monthly Points Consumed */}
+        {/* All Points Consumed to Today */}
         <motion.div
           initial={{ y: 10, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -260,17 +288,26 @@ export default function AdminDashboardPage() {
           className="bg-white p-5 rounded-3xl border border-[#F5E6D3] shadow-sm flex items-center justify-between"
         >
           <div>
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-              Month Points Used
-            </span>
-            <div className="text-2xl font-black text-[#1A1A2E] mt-1">
-              {stats.monthlyPointsUsed} <span className="text-xs font-semibold text-[#8B4513]">pts</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                All Points to Today
+              </span>
+              <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-[#E67E22]/15 text-[#E67E22]">
+                Active Cycle
+              </span>
+            </div>
+            <div className="text-2xl font-black text-[#1A1A2E] mt-1 flex items-baseline gap-1">
+              <span>{stats.allPointsToToday}</span>
+              <span className="text-xs font-semibold text-[#8B4513]">total pts</span>
+            </div>
+            <div className="text-[10px] text-gray-400 mt-0.5">
+              {stats.adjustmentPointsToToday} manual adj + {stats.mealPointsToToday} meal orders
             </div>
             <Link
-              href="/admin/allocation"
+              href="/admin/treasury"
               className="text-[11px] font-bold text-[#E67E22] hover:underline flex items-center gap-0.5 mt-2"
             >
-              <span>Calculate pricing</span>
+              <span>View points breakdown</span>
               <ArrowUpRight size={12} />
             </Link>
           </div>
@@ -335,6 +372,16 @@ export default function AdminDashboardPage() {
               Cutoff: {cutoffs?.dinnerCutoffTime || '15:00'}
             </span>
           </div>
+        </div>
+
+        <div className="mt-4 pt-3 border-t border-[#F5E6D3]/60 flex items-center justify-between flex-wrap gap-2 text-xs">
+          <span className="text-gray-500 font-medium flex items-center gap-1.5">
+            <Sparkles size={14} className="text-[#E67E22]" />
+            Cumulative Staff Points Consumed to Date:
+          </span>
+          <span className="font-extrabold text-[#1A1A2E] bg-[#FFF8F0] px-3 py-1 rounded-xl border border-[#F5E6D3]">
+            <span className="text-[#E67E22] font-black">{stats.allPointsToToday}</span> Total Points (Nov 8 – Today)
+          </span>
         </div>
       </div>
 

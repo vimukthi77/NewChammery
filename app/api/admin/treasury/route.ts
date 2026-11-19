@@ -103,6 +103,21 @@ export async function GET(req: Request) {
       ? Number((currentAllocationBudget / totalPointsThisMonth).toFixed(2))
       : 0;
 
+    // All-time points consumed up to today
+    const now = new Date();
+    const allMealToTodayAgg = await MealRequest.aggregate([
+      { $match: { date: { $lte: now }, status: { $ne: 'cancelled' } } },
+      { $group: { _id: null, pts: { $sum: '$totalPoints' } } },
+    ]);
+    const allMealPointsToToday = allMealToTodayAgg[0]?.pts || 0;
+
+    const allAdjToTodayAgg = await Topup.aggregate([
+      { $match: { type: 'points_adjustment', createdAt: { $lte: now } } },
+      { $group: { _id: null, pts: { $sum: '$points' } } },
+    ]);
+    const allAdjustmentPointsToToday = allAdjToTodayAgg[0]?.pts || 0;
+    const allPointsToToday = allMealPointsToToday + allAdjustmentPointsToToday;
+
     // 7. Lifetime Topups & Deductions totals
     const allTopups = await Topup.aggregate([
       {
@@ -158,6 +173,9 @@ export async function GET(req: Request) {
         currentAllocationBudget, // This month Chammery allocation
         availableBalance, // totalStaffBalance - currentAllocationBudget
         totalPointsThisMonth,
+        allPointsToToday,
+        allMealPointsToToday,
+        allAdjustmentPointsToToday,
         estimatedPointPrice,
         staffCount: staffUsers.length,
         deficitCount,

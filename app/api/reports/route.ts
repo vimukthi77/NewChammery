@@ -8,6 +8,8 @@ import Topup from '@/lib/models/Topup';
 import MonthlyAllocation from '@/lib/models/MonthlyAllocation';
 import { normalizeDate } from '@/lib/utils';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -106,10 +108,16 @@ export async function GET(req: Request) {
         createdAt: { $gte: startDate, $lte: endDate },
       });
 
-      const totalPointsUsed = mealRequests
+      const adjPoints = topups
+        .filter((t: any) => t.type === 'points_adjustment')
+        .reduce((sum: number, t: any) => sum + (t.points || 0), 0);
+      const mealPointsUsed = mealRequests
         .filter((r) => r.status !== 'cancelled')
         .reduce((sum, r) => sum + (r.totalPoints || 0), 0);
-      const totalPointsAllocated = topups.reduce((sum, t) => sum + (t.points || 0), 0);
+      const totalPointsUsed = Math.max(0, mealPointsUsed + adjPoints);
+      const totalPointsAllocated = topups
+        .filter((t: any) => t.type !== 'points_adjustment')
+        .reduce((sum: number, t: any) => sum + (t.points || 0), 0);
       const totalAmountPaid = topups.reduce((sum, t) => sum + (t.amount || 0), 0);
 
       const totalCost = Number((totalPointsUsed * pointPrice).toFixed(2));
@@ -163,7 +171,19 @@ export async function GET(req: Request) {
           { $group: { _id: null, totalPoints: { $sum: '$points' }, totalAmount: { $sum: '$amount' } } },
         ]);
 
-        const pointsUsed = meals[0]?.totalPoints || 0;
+        const topupAdj = await Topup.aggregate([
+          {
+            $match: {
+              userId: u._id,
+              type: 'points_adjustment',
+              createdAt: { $gte: startDate, $lte: endDate },
+            },
+          },
+          { $group: { _id: null, totalPoints: { $sum: '$points' } } },
+        ]);
+        const adjPoints = topupAdj[0]?.totalPoints || 0;
+        const mealPoints = meals[0]?.totalPoints || 0;
+        const pointsUsed = Math.max(0, mealPoints + adjPoints);
         const pointsAllocated = topups[0]?.totalPoints || 0;
         const amountPaid = topups[0]?.totalAmount || 0;
         const totalCost = Number((pointsUsed * pointPrice).toFixed(2));

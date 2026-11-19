@@ -8,6 +8,8 @@ import CutoffSettings from '@/lib/models/CutoffSettings';
 import Topup from '@/lib/models/Topup';
 import { normalizeDate } from '@/lib/utils';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -129,30 +131,67 @@ export async function GET(req: Request) {
 
     // Calculate user balance if specific user
     let userStats = null;
+    let totalAdjustmentPoints = 0;
+
     if (!allUsers || !isAdmin) {
       const userDoc = await User.findById(effectiveUserId);
+      const adjMatch: any = {
+        userId: userDoc?._id,
+        type: 'points_adjustment',
+      };
+      if (monthParam) {
+        adjMatch.month = monthParam;
+      }
+      const adjAgg = await Topup.aggregate([
+        { $match: adjMatch },
+        { $group: { _id: null, pts: { $sum: '$points' } } },
+      ]);
+      const adjustmentPoints = adjAgg[0]?.pts || 0;
+
       const topups = await Topup.aggregate([
-        { $match: { userId: effectiveUserId } },
+        { $match: { userId: effectiveUserId, type: { $ne: 'points_adjustment' } } },
         { $group: { _id: null, totalPoints: { $sum: '$points' } } },
       ]);
       const allocated = topups[0]?.totalPoints || 0;
-      const totalUsed = requests
+      const mealPointsUsed = requests
         .filter((r) => r.status !== 'cancelled')
         .reduce((sum, r) => sum + (r.totalPoints || 0), 0);
+      const totalUsed = Math.max(0, mealPointsUsed + adjustmentPoints);
+
       userStats = {
         allocated,
         used: totalUsed,
+        mealPointsUsed,
+        adjustmentPoints,
         balance: allocated - totalUsed,
         monetaryBalance: typeof userDoc?.balance === 'number' ? userDoc.balance : 15000,
         startDate: userDoc?.startDate,
       };
+    } else if (isAdmin && allUsers) {
+      const adjMatch: any = { type: 'points_adjustment' };
+      if (monthParam) {
+        adjMatch.month = monthParam;
+      }
+      const allAdj = await Topup.aggregate([
+        { $match: adjMatch },
+        { $group: { _id: null, pts: { $sum: '$points' } } },
+      ]);
+      totalAdjustmentPoints = allAdj[0]?.pts || 0;
     }
+
+    const mealPointsSum = requests
+      .filter((r) => r.status !== 'cancelled')
+      .reduce((sum, r) => sum + (r.totalPoints || 0), 0);
+    const totalPointsWithAdjustments = mealPointsSum + totalAdjustmentPoints;
 
     return NextResponse.json({
       success: true,
       requests,
       cutoffs,
       userStats,
+      totalAdjustmentPoints,
+      mealPointsSum,
+      totalPointsWithAdjustments,
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
