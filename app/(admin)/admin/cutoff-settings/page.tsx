@@ -58,13 +58,16 @@ export default function CutoffSettingsPage() {
       const text = await res.text();
       let data: any = {};
       try {
-        data = JSON.parse(text);
+        data = text ? JSON.parse(text) : {};
       } catch {
-        throw new Error(text || `Server returned ${res.status}: ${res.statusText}`);
+        data = {};
       }
 
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to update cutoffs');
+        if (res.status === 401 || res.status === 403) {
+          throw new Error('Your session expired or admin permissions are required. Please re-login.');
+        }
+        throw new Error(data.error || text || `Server returned ${res.status}: ${res.statusText}`);
       }
 
       toast.success('Cutoff times updated globally!');

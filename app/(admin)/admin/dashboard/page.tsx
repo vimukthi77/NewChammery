@@ -64,12 +64,22 @@ export default function AdminDashboardPage() {
           fetch(`/api/meals?all=true&month=${currentMonth}`),
         ]);
 
+        const safeParse = async (r: Response, fallback: any = {}) => {
+          try {
+            if (!r.ok) return fallback;
+            const txt = await r.text();
+            return txt ? JSON.parse(txt) : fallback;
+          } catch {
+            return fallback;
+          }
+        };
+
         const [usersData, dailyData, cutoffData, treasuryData, mealsData] = await Promise.all([
-          usersRes.json(),
-          dailyRes.json(),
-          cutoffRes.json(),
-          treasuryRes.json(),
-          mealsRes.json(),
+          safeParse(usersRes, { users: [] }),
+          safeParse(dailyRes, { reports: [] }),
+          safeParse(cutoffRes, { settings: {} }),
+          safeParse(treasuryRes, { treasury: {} }),
+          safeParse(mealsRes, { requests: [] }),
         ]);
 
         const monthlyMealPoints = (mealsData.requests || [])

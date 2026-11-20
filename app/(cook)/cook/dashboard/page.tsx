@@ -39,6 +39,7 @@ export default function CookDashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date>(new Date());
 
   // Data state
   const [counts, setCounts] = useState({
@@ -66,13 +67,23 @@ export default function CookDashboardPage() {
       else setLoading(true);
 
       const res = await fetch(`/api/meals?date=${targetDate}&all=true`);
-      const data = await res.json();
+      const text = await res.text();
+      let data: any = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = {};
+      }
 
-      if (data.success) {
+      if (res.ok && data.success) {
         setCounts(data.counts || { breakfast: 0, lunch: 0, dinner: 0, totalPoints: 0 });
         setLists(data.lists || { breakfastList: [], lunchList: [], dinnerList: [] });
         setAllRequests(data.requests || []);
         if (data.cutoffs) setCutoffs(data.cutoffs);
+        setLastRefreshedAt(new Date());
+        if (isRefresh) {
+          toast.success('Kitchen roster updated with latest orders!');
+        }
       } else {
         toast.error(data.error || 'Failed to load meal roster');
       }
@@ -275,24 +286,29 @@ export default function CookDashboardPage() {
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 text-[11px] text-gray-300 border border-white/10">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Synced {format(lastRefreshedAt, 'hh:mm:ss a')}</span>
+            </div>
+
             <button
               onClick={() => fetchRoster(selectedDate, true)}
               disabled={refreshing}
-              className="px-3.5 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 text-xs font-bold text-white border border-white/15 transition flex items-center gap-1.5 backdrop-blur-md shadow-sm"
-              title="Refresh Roster"
+              className="px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 active:scale-95 text-xs font-bold text-white border border-white/20 transition flex items-center gap-2 backdrop-blur-md shadow-md disabled:opacity-50"
+              title="Refresh Roster to see newest meal requests"
             >
-              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-              <span className="hidden sm:inline">Refresh</span>
+              <RefreshCw size={15} className={refreshing ? 'animate-spin text-[#E67E22]' : ''} />
+              <span>{refreshing ? 'Refreshing...' : 'Refresh Orders'}</span>
             </button>
 
             <button
               onClick={handleDownloadPDF}
-              className="px-4 py-2.5 rounded-2xl bg-[#E67E22] hover:bg-[#D35400] active:scale-95 text-xs font-bold text-white transition flex items-center gap-1.5 shadow-lg shadow-[#E67E22]/30"
+              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#E67E22] to-[#D35400] hover:brightness-110 active:scale-95 text-xs font-bold text-white transition flex items-center gap-2 shadow-lg shadow-[#E67E22]/30"
               title="Download Kitchen Roster PDF"
             >
-              <Download size={14} />
-              <span>Download Sheet (PDF)</span>
+              <Download size={15} />
+              <span>Download Sheet</span>
             </button>
           </div>
         </div>
@@ -697,6 +713,17 @@ export default function CookDashboardPage() {
             )}
           </div>
         )}
+      </div>
+      {/* Mobile Floating Quick Refresh Button */}
+      <div className="sm:hidden fixed bottom-20 right-4 z-40">
+        <button
+          onClick={() => fetchRoster(selectedDate, true)}
+          disabled={refreshing}
+          className="flex items-center gap-2 px-4 py-3 bg-[#E67E22] hover:bg-[#D35400] text-white rounded-full shadow-2xl font-bold text-xs active:scale-95 transition border-2 border-white/30 backdrop-blur-md"
+        >
+          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+          <span>{refreshing ? 'Syncing...' : 'Refresh'}</span>
+        </button>
       </div>
     </div>
   );
