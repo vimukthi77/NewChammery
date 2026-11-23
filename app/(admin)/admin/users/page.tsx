@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
@@ -24,6 +26,15 @@ import {
 import toast from 'react-hot-toast';
 
 export default function AdminUsersPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === 'authenticated' && (session?.user as any)?.role !== 'admin') {
+      router.replace('/dashboard');
+    }
+  }, [session, status, router]);
+
   const [users, setUsers] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);

@@ -86,21 +86,16 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async redirect({ url, baseUrl }) {
-      // 1. If url is a relative URL (e.g. '/login', '/dashboard'), keep it relative!
-      // This guarantees the browser stays on the current domain without any cross-domain jumps!
       if (url.startsWith('/')) {
         return url;
       }
 
-      // 2. Parse absolute target URL
       try {
         const targetUrl = new URL(url);
-        // Explicitly block any redirect to vercel.com platform login
         if (targetUrl.hostname === 'vercel.com' || targetUrl.hostname.endsWith('.vercel.com')) {
           return '/login';
         }
 
-        // Allow if same origin as baseUrl or canonical domain
         if (
           targetUrl.origin === baseUrl ||
           targetUrl.hostname === 'new-chammery.vercel.app' ||
@@ -112,18 +107,6 @@ export const authOptions: NextAuthOptions = {
       } catch {}
 
       return '/login';
-    },
-  },
-  useSecureCookies: process.env.NODE_ENV === 'production',
-  cookies: {
-    sessionToken: {
-      name: process.env.NODE_ENV === 'production' ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-      },
     },
   },
   session: {

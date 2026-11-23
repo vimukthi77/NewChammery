@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Users,
@@ -24,6 +26,15 @@ import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 
 export default function AdminDashboardPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === 'authenticated' && (session?.user as any)?.role !== 'admin') {
+      router.replace('/dashboard');
+    }
+  }, [session, status, router]);
+
   const [stats, setStats] = useState({
     totalUsers: 0,
     todayBreakfast: 0,

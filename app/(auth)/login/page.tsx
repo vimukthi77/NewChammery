@@ -52,18 +52,19 @@ export default function LoginPage() {
 
       toast.success('Welcome back!');
 
-      // Fetch user role from session
-      const sessionRes = await fetch('/api/auth/session');
+      // Fetch user role from session with fresh cache
+      const sessionRes = await fetch('/api/auth/session', { cache: 'no-store' });
       const sessionData = await sessionRes.json();
       const userRole = sessionData?.user?.role;
+      const sessionEmail = sessionData?.user?.email?.toLowerCase();
 
-      if (userRole === 'admin') {
-        router.push('/admin/dashboard');
+      if (userRole === 'admin' && (!sessionEmail || sessionEmail === email.toLowerCase().trim())) {
+        router.replace('/admin/dashboard');
         return;
       }
 
       if (userRole === 'cook') {
-        router.push('/cook/dashboard');
+        router.replace('/cook/dashboard');
         return;
       }
 
@@ -72,7 +73,7 @@ export default function LoginPage() {
       if (!enrolled) {
         setShowBiometricEnrollModal(true);
       } else {
-        router.push('/dashboard');
+        router.replace('/dashboard');
       }
     } catch (err: any) {
       toast.error(err.message || 'Login failed');
