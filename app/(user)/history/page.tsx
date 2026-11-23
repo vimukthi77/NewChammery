@@ -304,7 +304,11 @@ export default function MealHistoryPage() {
               const dateObj = new Date(item.date);
               const dateStr = formatDateString(dateObj);
               const isCancelled = item.status === 'cancelled';
-              const canCancelBreakfast = cutoffs && !isPastCutoff(cutoffs.breakfastCutoffTime, dateObj);
+              const canCancelAnyMeal = cutoffs && (
+                (item.breakfast && !isPastCutoff(cutoffs.breakfastCutoffTime, dateObj)) ||
+                (item.lunch && !isPastCutoff(cutoffs.lunchCutoffTime, dateObj)) ||
+                (item.dinner && !isPastCutoff(cutoffs.dinnerCutoffTime, dateObj))
+              );
 
               return (
                 <motion.div
@@ -372,7 +376,7 @@ export default function MealHistoryPage() {
                   </div>
 
                   {/* Cancel option if before cutoff */}
-                  {!isCancelled && item.totalPoints > 0 && canCancelBreakfast && (
+                  {!isCancelled && item.totalPoints > 0 && canCancelAnyMeal && (
                     <div className="mt-3 pt-2 border-t border-gray-100 flex justify-end">
                       <button
                         onClick={() => handleCancelMeal(dateStr)}

@@ -86,28 +86,44 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async redirect({ url, baseUrl }) {
-      // If baseUrl is pointing to localhost but running in production / Vercel
-      let effectiveBase = baseUrl;
-      if (effectiveBase.includes('localhost') && process.env.VERCEL_URL) {
-        effectiveBase = `https://${process.env.VERCEL_URL}`;
-      } else if (effectiveBase.includes('localhost') && process.env.NODE_ENV === 'production') {
-        effectiveBase = 'https://new-chammery.vercel.app';
-      }
-
-      // Allows relative URLs
+      // 1. If url is a relative URL (e.g. '/login', '/dashboard'), keep it relative!
+      // This guarantees the browser stays on the current domain without any cross-domain jumps!
       if (url.startsWith('/')) {
-        return `${effectiveBase.replace(/\/$/, '')}${url}`;
+        return url;
       }
 
-      // Allows URLs on the same deployment or origin
+      // 2. Parse absolute target URL
       try {
         const targetUrl = new URL(url);
-        if (targetUrl.hostname.includes('vercel.app') || targetUrl.hostname === 'localhost') {
+        // Explicitly block any redirect to vercel.com platform login
+        if (targetUrl.hostname === 'vercel.com' || targetUrl.hostname.endsWith('.vercel.com')) {
+          return '/login';
+        }
+
+        // Allow if same origin as baseUrl or canonical domain
+        if (
+          targetUrl.origin === baseUrl ||
+          targetUrl.hostname === 'new-chammery.vercel.app' ||
+          targetUrl.hostname === 'localhost' ||
+          targetUrl.hostname.includes('127.0.0.1')
+        ) {
           return url;
         }
       } catch {}
 
-      return effectiveBase;
+      return '/login';
+    },
+  },
+  useSecureCookies: process.env.NODE_ENV === 'production',
+  cookies: {
+    sessionToken: {
+      name: process.env.NODE_ENV === 'production' ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
     },
   },
   session: {

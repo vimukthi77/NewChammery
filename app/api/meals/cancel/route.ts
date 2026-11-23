@@ -41,38 +41,65 @@ export async function POST(req: Request) {
     const isToday = normalizeDate(now).getTime() === queryDate.getTime();
 
     if (!isAdmin && isToday && cutoffs) {
-      if (mealType === 'breakfast' && isPastCutoff(cutoffs.breakfastCutoffTime, date)) {
-        return NextResponse.json({ success: false, error: 'Breakfast cutoff has passed. Cannot cancel.' }, { status: 400 });
-      }
-      if (mealType === 'lunch' && isPastCutoff(cutoffs.lunchCutoffTime, date)) {
-        return NextResponse.json({ success: false, error: 'Lunch cutoff has passed. Cannot cancel.' }, { status: 400 });
-      }
-      if (mealType === 'dinner' && isPastCutoff(cutoffs.dinnerCutoffTime, date)) {
-        return NextResponse.json({ success: false, error: 'Dinner cutoff has passed. Cannot cancel.' }, { status: 400 });
-      }
-      if (!mealType && isPastCutoff(cutoffs.breakfastCutoffTime, date)) {
-        return NextResponse.json({ success: false, error: 'Cutoff passed for one or more meals.' }, { status: 400 });
-      }
-    }
+      if (mealType === 'breakfast') {
+        if (isPastCutoff(cutoffs.breakfastCutoffTime, date)) {
+          return NextResponse.json({ success: false, error: 'Breakfast cutoff has passed. Cannot cancel.' }, { status: 400 });
+        }
+        mealReq.breakfast = false;
+        mealReq.breakfastPoints = 0;
+      } else if (mealType === 'lunch') {
+        if (isPastCutoff(cutoffs.lunchCutoffTime, date)) {
+          return NextResponse.json({ success: false, error: 'Lunch cutoff has passed. Cannot cancel.' }, { status: 400 });
+        }
+        mealReq.lunch = false;
+        mealReq.lunchPoints = 0;
+      } else if (mealType === 'dinner') {
+        if (isPastCutoff(cutoffs.dinnerCutoffTime, date)) {
+          return NextResponse.json({ success: false, error: 'Dinner cutoff has passed. Cannot cancel.' }, { status: 400 });
+        }
+        mealReq.dinner = false;
+        mealReq.dinnerPoints = 0;
+      } else {
+        // Cancel all meals where cutoff hasn't passed
+        const canCancelBreakfast = !isPastCutoff(cutoffs.breakfastCutoffTime, date);
+        const canCancelLunch = !isPastCutoff(cutoffs.lunchCutoffTime, date);
+        const canCancelDinner = !isPastCutoff(cutoffs.dinnerCutoffTime, date);
 
-    if (mealType === 'breakfast') {
-      mealReq.breakfast = false;
-      mealReq.breakfastPoints = 0;
-    } else if (mealType === 'lunch') {
-      mealReq.lunch = false;
-      mealReq.lunchPoints = 0;
-    } else if (mealType === 'dinner') {
-      mealReq.dinner = false;
-      mealReq.dinnerPoints = 0;
+        if (!canCancelBreakfast && !canCancelLunch && !canCancelDinner) {
+          return NextResponse.json({ success: false, error: 'Cutoff times have passed for all meals today. Cannot cancel.' }, { status: 400 });
+        }
+
+        if (canCancelBreakfast) {
+          mealReq.breakfast = false;
+          mealReq.breakfastPoints = 0;
+        }
+        if (canCancelLunch) {
+          mealReq.lunch = false;
+          mealReq.lunchPoints = 0;
+        }
+        if (canCancelDinner) {
+          mealReq.dinner = false;
+          mealReq.dinnerPoints = 0;
+        }
+      }
     } else {
-      // Cancel all meals for this date
-      mealReq.breakfast = false;
-      mealReq.lunch = false;
-      mealReq.dinner = false;
-      mealReq.breakfastPoints = 0;
-      mealReq.lunchPoints = 0;
-      mealReq.dinnerPoints = 0;
-      mealReq.status = 'cancelled';
+      if (mealType === 'breakfast') {
+        mealReq.breakfast = false;
+        mealReq.breakfastPoints = 0;
+      } else if (mealType === 'lunch') {
+        mealReq.lunch = false;
+        mealReq.lunchPoints = 0;
+      } else if (mealType === 'dinner') {
+        mealReq.dinner = false;
+        mealReq.dinnerPoints = 0;
+      } else {
+        mealReq.breakfast = false;
+        mealReq.lunch = false;
+        mealReq.dinner = false;
+        mealReq.breakfastPoints = 0;
+        mealReq.lunchPoints = 0;
+        mealReq.dinnerPoints = 0;
+      }
     }
 
     mealReq.totalPoints = mealReq.breakfastPoints + mealReq.lunchPoints + mealReq.dinnerPoints;

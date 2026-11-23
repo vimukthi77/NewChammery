@@ -92,37 +92,65 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Cutoff validation for today's requests
-    if (!isAdmin && requestDateMidnight === todayMidnight) {
-      if (breakfast && isPastCutoff(cutoffs.breakfastCutoffTime, date)) {
-        return NextResponse.json({
-          success: false,
-          error: `Breakfast cutoff time (${cutoffs.breakfastCutoffTime}) has passed for today.`,
-        }, { status: 400 });
-      }
-      if (lunch && isPastCutoff(cutoffs.lunchCutoffTime, date)) {
-        return NextResponse.json({
-          success: false,
-          error: `Lunch cutoff time (${cutoffs.lunchCutoffTime}) has passed for today.`,
-        }, { status: 400 });
-      }
-      if (dinner && isPastCutoff(cutoffs.dinnerCutoffTime, date)) {
-        return NextResponse.json({
-          success: false,
-          error: `Dinner cutoff time (${cutoffs.dinnerCutoffTime}) has passed for today.`,
-        }, { status: 400 });
-      }
-    }
-
-    // Existing request
+    // Existing request for this user and date
     let mealReq = await MealRequest.findOne({
       userId: effectiveUserId,
       date: queryDate,
     });
 
-    const isBreakfast = Boolean(breakfast);
-    const isLunch = Boolean(lunch);
-    const isDinner = Boolean(dinner);
+    const prevBreakfast = Boolean(mealReq?.breakfast);
+    const prevLunch = Boolean(mealReq?.lunch);
+    const prevDinner = Boolean(mealReq?.dinner);
+
+    let isBreakfast = Boolean(breakfast);
+    let isLunch = Boolean(lunch);
+    let isDinner = Boolean(dinner);
+
+    // Cutoff validation for today's requests in Sri Lanka:
+    // Only check and restrict meals that the user is trying to CHANGE after their respective cutoffs!
+    if (!isAdmin && requestDateMidnight === todayMidnight) {
+      // 1. Breakfast Cutoff Validation
+      if (isPastCutoff(cutoffs.breakfastCutoffTime, date)) {
+        if (isBreakfast !== prevBreakfast) {
+          return NextResponse.json({
+            success: false,
+            error: isBreakfast
+              ? `Breakfast cutoff time (${cutoffs.breakfastCutoffTime}) has passed for today.`
+              : `Breakfast cutoff time (${cutoffs.breakfastCutoffTime}) has passed. Breakfast cannot be cancelled now.`,
+          }, { status: 400 });
+        }
+        // Lock breakfast to previous state
+        isBreakfast = prevBreakfast;
+      }
+
+      // 2. Lunch Cutoff Validation
+      if (isPastCutoff(cutoffs.lunchCutoffTime, date)) {
+        if (isLunch !== prevLunch) {
+          return NextResponse.json({
+            success: false,
+            error: isLunch
+              ? `Lunch cutoff time (${cutoffs.lunchCutoffTime}) has passed for today.`
+              : `Lunch cutoff time (${cutoffs.lunchCutoffTime}) has passed. Lunch cannot be cancelled now.`,
+          }, { status: 400 });
+        }
+        // Lock lunch to previous state
+        isLunch = prevLunch;
+      }
+
+      // 3. Dinner Cutoff Validation
+      if (isPastCutoff(cutoffs.dinnerCutoffTime, date)) {
+        if (isDinner !== prevDinner) {
+          return NextResponse.json({
+            success: false,
+            error: isDinner
+              ? `Dinner cutoff time (${cutoffs.dinnerCutoffTime}) has passed for today.`
+              : `Dinner cutoff time (${cutoffs.dinnerCutoffTime}) has passed. Dinner cannot be cancelled now.`,
+          }, { status: 400 });
+        }
+        // Lock dinner to previous state
+        isDinner = prevDinner;
+      }
+    }
 
     const breakfastPoints = isBreakfast ? 1 : 0;
     const lunchPoints = isLunch ? 2 : 0;

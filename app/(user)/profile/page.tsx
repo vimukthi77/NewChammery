@@ -265,7 +265,13 @@ export default function UserProfilePage() {
 
         {/* Logout Button */}
         <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
+          onClick={async () => {
+            try {
+              await signOut({ callbackUrl: '/login', redirect: true });
+            } catch {
+              window.location.href = '/login';
+            }
+          }}
           type="button"
           className="w-full py-3.5 px-4 bg-white hover:bg-red-50 text-red-600 font-bold text-xs rounded-3xl border border-red-200 shadow-sm flex items-center justify-center gap-2 transition"
         >

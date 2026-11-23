@@ -26,38 +26,81 @@ export function generateSecurePassword(length = 8): string {
   return password.split('').sort(() => 0.5 - Math.random()).join('');
 }
 
+export function getSriLankaDateString(date: Date = new Date()): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Colombo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
+  } catch {
+    const d = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
+    return d.toISOString().split('T')[0];
+  }
+}
+
+export function getSriLankaTimeString(date: Date = new Date()): string {
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Colombo',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(date);
+  } catch {
+    const d = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
+    return d.toISOString().substring(11, 16);
+  }
+}
+
 export function normalizeDate(date: Date | string): Date {
-  const d = new Date(date);
-  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0));
+  const dateStr = typeof date === 'string'
+    ? (date.includes('T') ? date.split('T')[0] : date.slice(0, 10))
+    : getSriLankaDateString(date);
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
 }
 
 export function formatDateString(date: Date | string): string {
-  const d = new Date(date);
-  return d.toISOString().split('T')[0];
+  if (typeof date === 'string') {
+    return date.includes('T') ? date.split('T')[0] : date.slice(0, 10);
+  }
+  return getSriLankaDateString(date);
 }
 
 export function isPastCutoff(cutoffTimeStr: string, targetDate?: Date | string): boolean {
-  const now = new Date();
-  const target = targetDate ? new Date(targetDate) : new Date();
+  if (!cutoffTimeStr) return false;
 
-  // Compare year, month, date
-  const targetMidnight = new Date(target.getFullYear(), target.getMonth(), target.getDate()).getTime();
-  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const todayStr = getSriLankaDateString(new Date());
 
-  // If target date is in the past, cutoff is always passed
-  if (targetMidnight < todayMidnight) {
+  let targetStr = todayStr;
+  if (targetDate) {
+    if (typeof targetDate === 'string') {
+      targetStr = targetDate.includes('T') ? targetDate.split('T')[0] : targetDate.slice(0, 10);
+    } else {
+      targetStr = getSriLankaDateString(targetDate);
+    }
+  }
+
+  // If target date is in the past (before today in Sri Lanka)
+  if (targetStr < todayStr) {
     return true;
   }
-  // If target date is in the future (tomorrow or later), cutoff is not passed
-  if (targetMidnight > todayMidnight) {
+  // If target date is in the future (after today in Sri Lanka)
+  if (targetStr > todayStr) {
     return false;
   }
 
-  // If target date is today, compare hours and minutes
-  const [cutoffHours, cutoffMinutes] = cutoffTimeStr.split(':').map(Number);
-  const cutoffDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), cutoffHours || 0, cutoffMinutes || 0, 0);
+  // Target date is TODAY in Sri Lanka: compare current Sri Lanka time with cutoff time
+  const currentSriLankaTime = getSriLankaTimeString(new Date());
+  const [cutoffH, cutoffM] = cutoffTimeStr.split(':').map(Number);
+  const [nowH, nowM] = currentSriLankaTime.split(':').map(Number);
 
-  return now.getTime() >= cutoffDate.getTime();
+  const cutoffMinutes = (cutoffH || 0) * 60 + (cutoffM || 0);
+  const nowMinutes = (nowH || 0) * 60 + (nowM || 0);
+
+  return nowMinutes >= cutoffMinutes;
 }
 
 export function formatCurrency(amount: number, currency = 'LKR'): string {

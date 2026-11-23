@@ -51,6 +51,7 @@ export default withAuth(
     return NextResponse.next();
   },
   {
+    secret: process.env.NEXTAUTH_SECRET || 'chammery-secret-key-2024-super-secure',
     callbacks: {
       authorized: ({ token, req }) => {
         const path = req.nextUrl.pathname;

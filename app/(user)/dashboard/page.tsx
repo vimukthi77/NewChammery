@@ -54,18 +54,25 @@ export default function UserDashboard() {
   const [saving, setSaving] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // Automatic cutoff logic:
-  // If current time is past today's dinner cutoff, automatically target tomorrow!
-  const now = new Date();
-  const isAfterDinnerCutoff = isPastCutoff(cutoffs.dinnerCutoffTime, now);
+  // Date Selection: Users can view/order for Today or Tomorrow
+  const [selectedDay, setSelectedDay] = useState<'today' | 'tomorrow'>('today');
+  const [hasAutoSwitched, setHasAutoSwitched] = useState(false);
 
-  const activeDate = isAfterDinnerCutoff ? addDays(now, 1) : now;
+  // Auto switch to tomorrow ONLY if today's dinner cutoff has passed and user hasn't toggled yet
+  useEffect(() => {
+    if (!hasAutoSwitched && isPastCutoff(cutoffs.dinnerCutoffTime)) {
+      setSelectedDay('tomorrow');
+      setHasAutoSwitched(true);
+    }
+  }, [cutoffs.dinnerCutoffTime, hasAutoSwitched]);
+
+  const activeDate = selectedDay === 'tomorrow' ? addDays(new Date(), 1) : new Date();
   const activeDateStr = formatDateString(activeDate);
-  const isViewingTomorrow = isAfterDinnerCutoff;
+  const isViewingTomorrow = selectedDay === 'tomorrow';
 
   // Determine greeting
   const getGreeting = () => {
-    const hour = now.getHours();
+    const hour = new Date().getHours();
     if (hour < 12) return 'Good Morning';
     if (hour < 17) return 'Good Afternoon';
     return 'Good Evening';
@@ -241,8 +248,39 @@ export default function UserDashboard() {
         </div>
       )}
 
-      {/* 3. Automatic Ordering Banner: Today's Meals OR Tomorrow's Meals */}
-      <div className="mb-4">
+      {/* 3. Date Selection & Ordering Banner */}
+      <div className="mb-4 space-y-2.5">
+        {/* Today vs Tomorrow Date Switcher */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedDay('today')}
+            className={`py-2 px-3.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 ${
+              selectedDay === 'today'
+                ? 'bg-[#1A1A2E] text-white shadow-md'
+                : 'bg-white border border-[#F5E6D3] text-[#1A1A2E] hover:bg-[#FFF8F0]'
+            }`}
+          >
+            <span>Today ({format(new Date(), 'MMM d')})</span>
+            {isPastCutoff(cutoffs.dinnerCutoffTime) && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-700">Closed</span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedDay('tomorrow')}
+            className={`py-2 px-3.5 rounded-2xl text-xs font-bold transition flex items-center gap-1.5 ${
+              selectedDay === 'tomorrow'
+                ? 'bg-[#1A1A2E] text-white shadow-md'
+                : 'bg-white border border-[#F5E6D3] text-[#1A1A2E] hover:bg-[#FFF8F0]'
+            }`}
+          >
+            <span>Tomorrow ({format(addDays(new Date(), 1), 'MMM d')})</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-700 font-extrabold">Open</span>
+          </button>
+        </div>
+
         <div className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between gap-3 ${
           isViewingTomorrow
             ? 'bg-[#FFF6ED] border-[#FFDAB9]'
@@ -260,8 +298,8 @@ export default function UserDashboard() {
             </div>
             <p className="text-xs text-gray-500 mt-0.5">
               {isViewingTomorrow
-                ? "Today's dinner cutoff has passed. Select and update tomorrow's meals below within cutoff time."
-                : "Select meals below. Orders can only be updated within cutoff times."}
+                ? "Pre-order tomorrow's meals in advance before daily cutoffs."
+                : "Select meals below. Orders can be updated anytime before their respective cutoff times."}
             </p>
           </div>
 
